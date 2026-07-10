@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>LE TAG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Doto:wght@600;800&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F3F3F1;
+    --card:#FFFFFF;
+    --ink:#1B1B1B;
+    --sub:#8A8A85;
+    --faint:#C9C8C3;
+    --line:rgba(0,0,0,0.06);
+    --red:#E23B2E;
+    --red-soft:#FBE9E6;
+    --field:#F6F6F4;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html{-webkit-text-size-adjust:100%;background:var(--bg);}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Space Grotesk',system-ui,sans-serif;
+    min-height:100vh;
+    padding:calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 48px);
+    -webkit-font-smoothing:antialiased;
+    font-size:15px;line-height:1.5;
+    overflow-x:hidden;
+  }
+  .wrap{width:100%;max-width:430px;margin:0 auto;position:relative;z-index:1;}
+
+  /* ---------- barre flottante (verre) ---------- */
+  .minibar{
+    position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:50%;z-index:40;
+    display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:99px;
+    background:rgba(255,255,255,.62);
+    backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);
+    border:1px solid rgba(0,0,0,.06);box-shadow:0 6px 20px rgba(0,0,0,.08);
+    font-size:12px;font-weight:600;letter-spacing:.5px;cursor:pointer;
+    transform:translate(-50%,-70px);opacity:0;
+    transition:transform .4s cubic-bezier(.2,.8,.25,1),opacity .3s;
+  }
+  .minibar.show{transform:translate(-50%,0);opacity:1;}
+  .pip{width:9px;height:9px;border-radius:50%;background:var(--red);flex:0 0 auto;}
+  .minibar .pip{width:8px;height:8px;}
+
+  /* ---------- top bar ---------- */
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;
+    opacity:0;animation:fadeDown .5s .05s ease both;}
+  .logo{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;letter-spacing:0.5px;}
+  .logo .pip{animation:pipPulse 2.6s ease-in-out infinite;}
+  .clock{font-size:12.5px;color:var(--sub);}
+  @keyframes pipPulse{0%,100%{box-shadow:0 0 0 0 rgba(226,59,46,.35);}50%{box-shadow:0 0 0 6px rgba(226,59,46,0);}}
+  @keyframes fadeDown{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:none;}}
+
+  .greet{font-size:26px;font-weight:600;letter-spacing:-0.4px;line-height:1.25;margin:0 0 6px;
+    opacity:0;animation:fadeDown .5s .12s ease both;}
+  .meteo{font-size:13px;color:var(--sub);margin:0 0 20px;
+    opacity:0;animation:fadeDown .5s .18s ease both;}
+  .meteo[hidden]{display:none;}
+
+  /* ---------- hero 3D ---------- */
+  .stage{
+    display:flex;flex-direction:column;align-items:center;
+    margin:6px 0 30px;
+    perspective:1000px;
+  }
+  .hero3d{
+    position:relative;
+    transform-style:preserve-3d;
+    will-change:transform;
+  }
+  .coin-halo{
+    position:absolute;inset:-14%;border-radius:50%;pointer-events:none;
+    background:radial-gradient(circle, rgba(226,59,46,.14) 0%, rgba(226,59,46,0) 62%);
+    transform:translateZ(-40px);
+  }
+  .wave{
+    position:absolute;inset:0;border-radius:50%;
+    border:1px solid rgba(226,59,46,.35);
+    opacity:0;pointer-events:none;
+  }
+  @keyframes waveGo{0%{opacity:.55;transform:scale(.62);}100%{opacity:0;transform:scale(1.6);}}
+  .wave.go{animation:waveGo 1.2s ease-out both;}
+
+  .medal{
+    position:relative;width:min(64vw,232px);aspect-ratio:1;
+    transform-style:preserve-3d;
+    will-change:transform;
+    cursor:pointer;
+    opacity:0;animation:medalIn .8s .2s cubic-bezier(.2,.8,.25,1) both;
+  }
+  @keyframes medalIn{
+    from{opacity:0;transform:translateY(24px) rotateX(30deg) scale(.92);}
+    to{opacity:1;transform:translateY(0) rotateX(0) scale(1);}
+  }
+  /* tranche usinée : couches générées en JS */
+  .medal-edge{position:absolute;inset:6%;border-radius:50%;}
+  /* face */
+  .medal-disc{
+    position:absolute;inset:6%;border-radius:50%;
+    background:radial-gradient(circle at 34% 28%, #FFFFFF 0%, #F8F8F6 48%, #EDEDEA 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.95),
+      inset 0 -6px 14px rgba(27,27,27,.04),
+      inset 0 0 0 1px rgba(27,27,27,.04);
+  }
+  /* antenne gravée, discrète */
+  .medal-coil{position:absolute;inset:12%;transform:translateZ(4px);pointer-events:none;opacity:.5;}
+  .medal-coil svg{width:100%;height:100%;display:block;}
+  .medal-ring{position:absolute;inset:0;transform:translateZ(14px);}
+  .medal-ring svg{width:100%;height:100%;display:block;overflow:visible;}
+  .medal-ring circle{transform-box:fill-box;transform-origin:center;}
+  .rdot{opacity:0;animation:dotIn .35s ease both;}
+  @keyframes dotIn{from{opacity:0;transform:scale(0);}to{opacity:1;transform:scale(1);}}
+  .rdot.lit-last{animation:dotIn .35s ease both, litPulse 2.4s 1.2s ease-in-out infinite;}
+  @keyframes litPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.45);}}
+  .medal-core{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;
+    transform:translateZ(32px);
+  }
+  .lvl-num{font-family:'Doto',monospace;font-weight:800;font-size:clamp(42px,14vw,60px);line-height:1;color:var(--ink);}
+  .lvl-title{font-size:11px;font-weight:600;letter-spacing:2px;color:var(--red);text-transform:uppercase;margin-top:8px;}
+  /* reflet métal : fine bande de lumière */
+  .medal-sheen{
+    position:absolute;inset:6%;border-radius:50%;pointer-events:none;
+    transform:translateZ(40px);
+    background:linear-gradient(var(--sa,115deg),
+      rgba(255,255,255,0) 40%,
+      rgba(255,255,255,.5) 50%,
+      rgba(255,255,255,0) 60%);
+    opacity:.5;
+    will-change:transform;
+  }
+  /* ombre de contact, solidaire de la pièce */
+  .coin-shadow{
+    position:absolute;left:12%;right:12%;bottom:-16px;height:20px;
+    background:#1B1B1B;border-radius:50%;
+    opacity:.10;filter:blur(13px);
+    transform:translateZ(-46px);
+    will-change:transform,opacity;
+  }
+  .xp-sub{font-size:12.5px;color:var(--sub);margin-top:26px;text-align:center;
+    opacity:0;animation:fadeIn .6s .7s ease both;}
+  .tilt-hint{font-size:10px;color:var(--faint);margin-top:6px;letter-spacing:1px;text-transform:uppercase;
+    opacity:0;animation:fadeIn .6s 1.4s ease both;}
+  @keyframes fadeIn{to{opacity:1;}}
+
+  /* ---------- cards ---------- */
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:20px;
+    padding:18px;margin-bottom:12px;
+    box-shadow:0 1px 2px rgba(27,27,27,.04), 0 12px 28px -18px rgba(27,27,27,.08);
+    opacity:0;
+    will-change:transform,opacity;
+  }
+  body.no-anim .card{opacity:1;transform:none !important;}
+  .card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+  .card-label{font-size:10.5px;font-weight:600;letter-spacing:1.8px;color:var(--sub);text-transform:uppercase;}
+  .card-meta{font-size:11px;color:var(--faint);}
+  button.card-meta{border:none;background:none;cursor:pointer;font-family:inherit;color:var(--sub);text-decoration:underline;padding:4px;}
+
+  .moment-tag{
+    display:inline-block;background:var(--red-soft);color:var(--red);
+    font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;
+    padding:5px 10px;border-radius:99px;margin-bottom:10px;
+  }
+  .moment-text{font-size:16px;line-height:1.55;}
+
+  textarea{
+    width:100%;background:var(--field);border:1.5px solid transparent;border-radius:14px;
+    color:var(--ink);font-family:'Space Grotesk',sans-serif;font-size:16px;
+    padding:12px 14px;resize:none;min-height:64px;line-height:1.5;
+    transition:border-color .2s, background .2s;
+  }
+  textarea::placeholder{color:var(--faint);}
+  textarea:focus{outline:none;border-color:var(--red);background:#fff;}
+  .save-row{display:flex;align-items:center;gap:12px;margin-top:12px;}
+  .btn-primary{
+    background:var(--ink);color:#fff;border:none;border-radius:99px;
+    font-family:'Space Grotesk',sans-serif;font-size:13.5px;font-weight:600;
+    padding:11px 20px;cursor:pointer;min-height:42px;
+    transition:transform .12s ease;
+  }
+  .btn-primary:active{transform:scale(0.95);}
+  .saved-note{font-size:12px;color:var(--sub);}
+  .journal-history{margin-top:14px;border-top:1px solid var(--line);padding-top:10px;}
+  .jh-row{display:flex;gap:10px;padding:6px 0;font-size:13px;align-items:baseline;}
+  .jh-date{color:var(--faint);font-size:11px;flex:0 0 58px;text-transform:capitalize;}
+  .jh-text{color:var(--sub);flex:1;word-break:break-word;}
+
+  .todo-add{display:flex;gap:10px;align-items:center;margin-bottom:6px;}
+  .todo-add input{
+    flex:1;min-width:0;background:var(--field);border:1.5px solid transparent;border-radius:99px;
+    color:var(--ink);font-family:'Space Grotesk',sans-serif;font-size:16px;padding:10px 16px;min-height:42px;
+    transition:border-color .2s, background .2s;
+  }
+  .todo-add input::placeholder{color:var(--faint);}
+  .todo-add input:focus{outline:none;border-color:var(--red);background:#fff;}
+  .add-btn{
+    background:var(--ink);color:#fff;border:none;border-radius:50%;
+    width:42px;height:42px;flex:0 0 42px;font-size:20px;line-height:1;cursor:pointer;
+    transition:transform .12s ease;
+  }
+  .add-btn:active{transform:scale(0.9) rotate(90deg);}
+  .todo-item{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--line);
+    animation:rowIn .3s ease both;}
+  @keyframes rowIn{from{opacity:0;transform:translateX(-6px);}to{opacity:1;transform:none;}}
+  .todo-item:last-child{border-bottom:none;}
+  .chk{
+    width:23px;height:23px;flex:0 0 23px;border:1.5px solid var(--faint);border-radius:50%;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;background:transparent;
+    transition:background .15s,border-color .15s;
+  }
+  .chk.on{background:var(--red);border-color:var(--red);animation:chkPop .3s cubic-bezier(.3,1.8,.4,1);}
+  @keyframes chkPop{50%{transform:scale(1.25);}}
+  .todo-text{flex:1;font-size:15px;word-break:break-word;transition:color .2s;}
+  .todo-text.done{color:var(--faint);text-decoration:line-through;}
+  .del{color:var(--faint);cursor:pointer;font-size:15px;padding:6px;flex:0 0 auto;border:none;background:none;}
+  .empty{color:var(--faint);font-size:13px;font-style:italic;padding:4px 2px;}
+
+  .links-row{display:flex;flex-wrap:wrap;gap:9px;}
+  .link-chip{
+    display:inline-flex;align-items:center;gap:8px;background:var(--field);
+    border:1px solid transparent;color:var(--ink);text-decoration:none;
+    padding:10px 16px;border-radius:99px;font-size:13.5px;font-weight:500;min-height:42px;
+    transition:transform .12s ease, background .15s;cursor:pointer;
+  }
+  .link-chip:active{background:var(--red-soft);color:var(--red);transform:scale(.96);}
+  .link-chip .rmv{color:var(--faint);font-size:12px;padding:2px;}
+  .link-chip.add{background:transparent;border:1.5px dashed var(--faint);color:var(--sub);}
+
+  .heatmap{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,1fr);gap:4.5px;justify-content:space-between;margin-bottom:6px;}
+  .hdot{width:8px;height:8px;border-radius:50%;background:#E8E7E3;opacity:0;animation:dotIn .3s ease both;}
+  .hdot.l1{background:#F5BCB2;}
+  .hdot.l2{background:#EE7A65;}
+  .hdot.l3{background:var(--red);}
+  body.no-anim .hdot, body.no-anim .rdot{opacity:1;animation:none;}
+  .heat-legend{display:flex;justify-content:space-between;font-size:10px;color:var(--faint);margin-bottom:18px;}
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;border-top:1px solid var(--line);padding-top:16px;}
+  .stat{text-align:center;}
+  .stat-num{font-family:'Doto',monospace;font-weight:800;font-size:22px;color:var(--ink);}
+  .stat-label{font-size:9px;font-weight:600;color:var(--sub);letter-spacing:1px;margin-top:4px;text-transform:uppercase;}
+
+  .ach-row{display:flex;justify-content:space-between;align-items:center;padding:9px 2px;border-bottom:1px solid var(--line);font-size:14px;}
+  .ach-row:last-child{border-bottom:none;}
+  .ach-row.locked{color:var(--faint);}
+  .ach-badge{
+    width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:11px;flex:0 0 22px;
+  }
+  .ach-row.unlocked .ach-badge{background:var(--red);color:#fff;}
+  .ach-row.locked .ach-badge{border:1.5px solid var(--line);color:transparent;}
+  .ach-name{flex:1;margin-left:12px;}
+
+  footer{text-align:center;margin-top:26px;font-size:10.5px;color:var(--faint);letter-spacing:1.5px;text-transform:uppercase;
+    opacity:0;animation:fadeIn .6s 1s ease both;}
+
+  .toast{
+    position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 16px);
+    transform:translateX(-50%);
+    background:var(--ink);color:#fff;font-size:12px;
+    padding:10px 18px;border-radius:99px;
+    box-shadow:0 4px 14px rgba(0,0,0,.18);
+    z-index:50;white-space:nowrap;
+    animation:toastIn .35s ease both;
+  }
+  @keyframes toastIn{from{opacity:0;transform:translate(-50%,10px);}to{opacity:1;transform:translate(-50%,0);}}
+
+  @media (max-width:340px){
+    .stat-grid{grid-template-columns:1fr 1fr;row-gap:16px;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation:none !important;transition:none !important;}
+    .card,.topbar,.greet,.meteo,.medal,.xp-sub,.coin-shadow,.tilt-hint,footer,.hdot,.rdot{opacity:1 !important;}
+    .card{transform:none !important;}
+    .coin-shadow{opacity:.10 !important;}
+  }
+</style>
+</head>
+<body>
+
+<div class="minibar" id="minibar"><span class="pip"></span><span id="mbText">—</span></div>
+
+<div class="wrap">
+
+  <div class="topbar">
+    <span class="logo"><span class="pip"></span>LE TAG</span>
+    <span class="clock" id="dateLine">—</span>
+  </div>
+
+  <h1 class="greet" id="greet">Bonjour.</h1>
+  <div class="meteo" id="meteo" hidden></div>
+
+  <div class="stage" id="stage">
+    <div class="hero3d" id="hero3d">
+      <div class="coin-halo"></div>
+      <div class="wave"></div>
+      <div class="wave"></div>
+      <div class="wave"></div>
+      <div class="medal" id="medal">
+        <div class="medal-disc"></div>
+        <div class="medal-coil">
+          <svg viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="40" fill="none" stroke="#D4D3CE" stroke-width="1.1"/>
+            <circle cx="50" cy="50" r="33" fill="none" stroke="#D4D3CE" stroke-width="1.1"/>
+            <circle cx="50" cy="50" r="26" fill="none" stroke="#D4D3CE" stroke-width="1.1"/>
+            <rect x="46" y="85.5" width="8" height="6" rx="1.4" fill="#CCCBC6"/>
+          </svg>
+        </div>
+        <div class="medal-ring"><svg id="ringSvg" viewBox="0 0 232 232"></svg></div>
+        <div class="medal-core">
+          <div class="lvl-num" id="lvlNum">0</div>
+          <div class="lvl-title" id="lvlTitle">—</div>
+        </div>
+        <div class="medal-sheen" id="medalSheen"></div>
+      </div>
+      <div class="coin-shadow" id="coinShadow"></div>
+    </div>
+    <div class="xp-sub" id="xpSub">chargement…</div>
+    <div class="tilt-hint">incline · tap pour tourner</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-label">Carte du moment</span>
+      <span class="card-meta">scan #<span id="scanCount">0</span></span>
+    </div>
+    <span class="moment-tag" id="cardTag">—</span>
+    <div class="moment-text" id="cardText">Ouverture du lien…</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-label">Journal du jour</span></div>
+    <textarea id="journalInput" placeholder="Une ligne sur ta journée…" maxlength="280"></textarea>
+    <div class="save-row">
+      <button class="btn-primary" id="journalSave">Enregistrer</button>
+      <span class="saved-note" id="journalNote"></span>
+    </div>
+    <div class="journal-history" id="journalHistory" hidden></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-label">Todo</span>
+      <button class="card-meta" id="clearDone" hidden>effacer faites</button>
+    </div>
+    <div class="todo-add">
+      <input type="text" id="todoInput" placeholder="Ajouter une tâche…">
+      <button class="add-btn" id="todoAdd" aria-label="Ajouter">+</button>
+    </div>
+    <div id="todoList"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-label">Accès rapide</span>
+      <button class="card-meta" id="manageLinks" hidden>gérer</button>
+    </div>
+    <div class="links-row" id="linksGrid"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-label">Activité</span>
+      <span class="card-meta">90 jours</span>
+    </div>
+    <div class="heatmap" id="heatmap"></div>
+    <div class="heat-legend"><span>il y a 90j</span><span>aujourd'hui</span></div>
+    <div class="stat-grid">
+      <div class="stat"><div class="stat-num" id="statTotal">0</div><div class="stat-label">Scans</div></div>
+      <div class="stat"><div class="stat-num" id="statStreak">0</div><div class="stat-label">Streak</div></div>
+      <div class="stat"><div class="stat-num" id="statBest">0</div><div class="stat-label">Record</div></div>
+      <div class="stat"><div class="stat-num" id="statHour">—</div><div class="stat-label">Heure fav.</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-label">Paliers</span></div>
+    <div id="achList"></div>
+  </div>
+
+  <footer>1 tag · 1 vie — NTAG215 · NFC type 2 · 540 o</footer>
+</div>
+
+<script>
+/* ============ stockage multi-couches ============ */
+const NS = "letag:v2:";
+const memStore = {};
+let mode = "memory";
+let persistWarned = false;
+
+function toast(msg){
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+function tryLocal(){
+  try{
+    const k = NS + "probe";
+    window.localStorage.setItem(k, "1");
+    window.localStorage.removeItem(k);
+    return true;
+  }catch(e){ return false; }
+}
+
+async function detectMode(){
+  if(window.storage && typeof window.storage.set === "function"){
+    try{
+      await window.storage.set(NS + "probe", "1", false);
+      mode = "artifact";
+      return;
+    }catch(e){}
+  }
+  if(tryLocal()){ mode = "local"; return; }
+  mode = "memory";
+}
+
+async function rawGet(key){
+  const k = NS + key;
+  if(mode === "artifact"){
+    try{
+      const r = await window.storage.get(k, false);
+      return r ? r.value : null;
+    }catch(e){ return null; }
+  }
+  if(mode === "local"){
+    try{ return window.localStorage.getItem(k); }catch(e){ return null; }
+  }
+  return (k in memStore) ? memStore[k] : null;
+}
+
+async function rawSet(key, value){
+  const k = NS + key;
+  if(mode === "artifact"){
+    try{ await window.storage.set(k, value, false); return; }
+    catch(e){ mode = tryLocal() ? "local" : "memory"; }
+  }
+  if(mode === "local"){
+    try{ window.localStorage.setItem(k, value); return; }
+    catch(e){ mode = "memory"; }
+  }
+  memStore[k] = value;
+  if(!persistWarned){
+    persistWarned = true;
+    toast("Sauvegarde indisponible — données de session uniquement");
+  }
+}
+
+const cache = {};
+function clone(v){ return JSON.parse(JSON.stringify(v)); }
+async function loadKey(key, fallback){
+  const raw = await rawGet(key);
+  if(raw === null){ cache[key] = clone(fallback); }
+  else{
+    try{ cache[key] = JSON.parse(raw); }
+    catch(e){ cache[key] = clone(fallback); }
+  }
+  return cache[key];
+}
+function getData(key){ return cache[key]; }
+async function saveKey(key){ await rawSet(key, JSON.stringify(cache[key])); }
+
+/* ============ clés ============ */
+const S_SCANS="scans", S_JOURNAL="journal", S_TODOS="todos", S_LINKS="links", S_LASTCARD="lastcard", S_METEO="meteo";
+const SCAN_COOLDOWN_MS = 60 * 1000;
+
+/* ============ contenu ============ */
+const CARDS = [
+  {t:"Citation", c:"« Le code que tu n'écris pas aujourd'hui, tu le débuggeras demain à 2h du matin. »"},
+  {t:"Citation", c:"« Fait est mieux que parfait. » — surtout à 23h58 avant un rendu."},
+  {t:"Citation", c:"« Un bon commit message vaut mille excuses. »"},
+  {t:"Citation", c:"« Le meilleur moment pour documenter ton code, c'était hier. Le deuxième meilleur, c'est maintenant. »"},
+  {t:"Citation", c:"« Ce n'est pas un bug, c'est une feature non documentée. » — toi, un jour, forcément."},
+  {t:"Micro-défi", c:"20 minutes sur un projet, sans notif, maintenant."},
+  {t:"Micro-défi", c:"Ferme un onglet ouvert depuis plus d'une semaine."},
+  {t:"Micro-défi", c:"Écris une ligne sur ce que tu as appris cette semaine."},
+  {t:"Micro-défi", c:"Bois un verre d'eau. Là. Tout de suite. Le code attendra."},
+  {t:"Micro-défi", c:"Étire-toi 30 secondes. Ton dos de dev te remerciera dans 10 ans."},
+  {t:"Micro-défi", c:"Envoie un message à quelqu'un à qui tu n'as pas parlé depuis un moment."},
+  {t:"Micro-défi", c:"Range un truc sur ton bureau. Un seul. C'est déjà ça."},
+  {t:"Micro-défi", c:"Fais un commit maintenant, même petit. Un projet qui avance, c'est une série de petits commits."},
+  {t:"Fun fact", c:"Le premier bug informatique était littéralement un insecte coincé dans un relais, en 1947."},
+  {t:"Fun fact", c:"Ton tag est un NTAG215 — la même puce que dans les Amiibo de Nintendo."},
+  {t:"Fun fact", c:"Le NFC fonctionne à 13,56 MHz, la même fréquence partout dans le monde."},
+  {t:"Fun fact", c:"Ton tag n'a pas de batterie : c'est ton téléphone qui l'alimente par induction à chaque scan."},
+  {t:"Fun fact", c:"Les 540 octets de ton tag pourraient contenir ce message environ 5 fois. Pas plus."},
+  {t:"Fun fact", c:"Le NFC descend de la RFID, inventée pendant la Seconde Guerre mondiale pour identifier les avions alliés."},
+  {t:"Check-in", c:"Note ton humeur sur 10 dans le journal du jour."},
+  {t:"Check-in", c:"C'est quoi LA priorité du jour ? Mets-la en haut de ta todo."},
+  {t:"Check-in", c:"Sur quoi tu procrastines en ce moment ? Le nommer, c'est déjà commencer."},
+  {t:"Rituel", c:"Regarde ta todo. Barre au moins une chose avant de reposer le tel."},
+  {t:"Rituel", c:"Trois respirations profondes. Sérieusement, personne ne regarde."}
+];
+
+const LEVELS = [
+  {min:0, title:"Novice"},
+  {min:5, title:"Initié"},
+  {min:15, title:"Habitué"},
+  {min:30, title:"Régulier"},
+  {min:50, title:"Fidèle"},
+  {min:75, title:"Vétéran"},
+  {min:100, title:"Maître du Tag"},
+  {min:150, title:"Légende"},
+  {min:250, title:"Mythique"},
+  {min:365, title:"Immortel"}
+];
+
+const ACHIEVEMENTS = [
+  {n:1, label:"Premier contact"},
+  {n:10, label:"10 scans"},
+  {n:25, label:"25 scans"},
+  {n:50, label:"50 scans"},
+  {n:100, label:"Centurion"},
+  {n:200, label:"200 scans"},
+  {n:365, label:"Un an de rituel"}
+];
+
+/* ============ helpers ============ */
+function pad2(n){ return String(n).padStart(2, "0"); }
+function todayKey(d = new Date()){
+  return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+}
+function dayKeyOf(iso){ return todayKey(new Date(iso)); }
+
+function levelFromScans(n){
+  let idx = 0;
+  for(let i=0;i<LEVELS.length;i++){ if(n >= LEVELS[i].min) idx = i; }
+  const next = LEVELS[idx+1];
+  return {level:idx, title:LEVELS[idx].title, min:LEVELS[idx].min, nextMin: next ? next.min : null};
+}
+
+function computeStreaks(days){
+  const sorted = [...days].sort();
+  if(sorted.length === 0) return {current:0, best:0};
+  let best = 1, run = 1;
+  for(let i=1;i<sorted.length;i++){
+    const diff = Math.round((new Date(sorted[i]) - new Date(sorted[i-1])) / 86400000);
+    run = (diff === 1) ? run + 1 : 1;
+    if(run > best) best = run;
+  }
+  let current = 0;
+  const cursor = new Date();
+  while(days.has(todayKey(cursor))){
+    current++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return {current, best};
+}
+
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+if(reducedMotion) document.body.classList.add("no-anim");
+
+function countUp(el, target, duration = 800){
+  if(reducedMotion || target === 0){ el.textContent = target; return; }
+  const start = performance.now();
+  function tick(now){
+    const p = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(eased * target);
+    if(p < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+function buildRing(litFrac){
+  const svg = document.getElementById("ringSvg");
+  const ns = "http://www.w3.org/2000/svg";
+  const size = 232, cx = size/2, cy = size/2, r = 100, numDots = 48;
+  const litCount = Math.round(litFrac * numDots);
+  svg.innerHTML = "";
+  for(let i=0;i<numDots;i++){
+    const angle = (i/numDots) * Math.PI * 2 - Math.PI/2;
+    const c = document.createElementNS(ns, "circle");
+    c.setAttribute("cx", cx + r * Math.cos(angle));
+    c.setAttribute("cy", cy + r * Math.sin(angle));
+    const lit = i < litCount;
+    c.setAttribute("r", lit ? 3.8 : 2.4);
+    c.setAttribute("fill", lit ? "#E23B2E" : "#DEDDD8");
+    c.classList.add("rdot");
+    if(lit && i === litCount - 1) c.classList.add("lit-last");
+    c.style.animationDelay = (0.5 + i * 0.022) + "s";
+    svg.appendChild(c);
+  }
+}
+
+/* ============ météo réelle ============ */
+const WMO = [
+  [[0], "ciel dégagé"],
+  [[1,2], "peu nuageux"],
+  [[3], "couvert"],
+  [[45,48], "brouillard"],
+  [[51,53,55,56,57], "bruine"],
+  [[61,63,65,66,67], "pluie"],
+  [[71,73,75,77], "neige"],
+  [[80,81,82], "averses"],
+  [[85,86], "averses de neige"],
+  [[95,96,99], "orage"]
+];
+function wmoLabel(code){
+  for(const [codes, label] of WMO){ if(codes.includes(code)) return label; }
+  return "";
+}
+
+async function initWeather(){
+  const el = document.getElementById("meteo");
+  const cached = getData(S_METEO);
+  if(cached && cached.txt && (Date.now() - cached.ts) < 3 * 3600 * 1000){
+    el.textContent = cached.txt;
+    el.hidden = false;
+  }
+  if(!("geolocation" in navigator)) return;
+  navigator.geolocation.getCurrentPosition(async pos => {
+    try{
+      const la = pos.coords.latitude.toFixed(3);
+      const lo = pos.coords.longitude.toFixed(3);
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${la}&longitude=${lo}&current=temperature_2m,weather_code&daily=sunrise,sunset&timezone=auto&forecast_days=2`;
+      const r = await fetch(url);
+      if(!r.ok) return;
+      const d = await r.json();
+      const t = Math.round(d.current.temperature_2m);
+      const label = wmoLabel(d.current.weather_code);
+      const now = new Date();
+      const sunrise = new Date(d.daily.sunrise[0]);
+      const sunset = new Date(d.daily.sunset[0]);
+      const fmt = x => x.toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"});
+      let sun;
+      if(now < sunrise) sun = "lever " + fmt(sunrise);
+      else if(now < sunset) sun = "coucher " + fmt(sunset);
+      else sun = "lever " + fmt(new Date(d.daily.sunrise[1]));
+      const txt = `${t}° · ${label} · ${sun}`;
+      el.textContent = txt;
+      el.hidden = false;
+      cache[S_METEO] = {txt, ts: Date.now()};
+      saveKey(S_METEO);
+    }catch(e){}
+  }, () => {}, {timeout: 4000, maximumAge: 30 * 60 * 1000});
+}
+
+/* ==================================================
+   MOTEUR 3D — une boucle, peu d'acteurs, propre :
+   - pièce : gyroscope / toucher / spin au tap
+   - tranche usinée générée (10 couches serrées)
+   - reflet métal + ombre de contact solidaires
+   - parallaxe du bloc hero entier au scroll
+   - cartes : entrée fondu + translation, puis figées
+================================================== */
+function initEngine(){
+  const hero3d = document.getElementById("hero3d");
+  const medal = document.getElementById("medal");
+  const sheen = document.getElementById("medalSheen");
+  const shadow = document.getElementById("coinShadow");
+  const stage = document.getElementById("stage");
+  const waves = [...document.querySelectorAll(".wave")];
+
+  /* tranche usinée : couches fines et serrées = rim lisse */
+  const EDGE_LAYERS = 10;
+  for(let i = 1; i <= EDGE_LAYERS; i++){
+    const e = document.createElement("div");
+    e.className = "medal-edge";
+    const shade = Math.round(236 - i * 3.4);
+    e.style.background = `rgb(${shade}, ${shade - 1}, ${shade - 4})`;
+    e.style.transform = `translateZ(${-i * 1.6}px)`;
+    medal.prepend(e);
+  }
+
+  /* fin de l'animation d'entrée : on rend la main au gyroscope */
+  medal.addEventListener("animationend", () => {
+    medal.style.animation = "none";
+    medal.style.opacity = "1";
+  }, {once:true});
+
+  function fireWaves(){
+    if(reducedMotion) return;
+    waves.forEach((w, i) => {
+      w.classList.remove("go");
+      void w.offsetWidth;
+      w.style.animationDelay = (i * 0.16) + "s";
+      w.classList.add("go");
+    });
+  }
+  setTimeout(fireWaves, 450);
+
+  if(reducedMotion) return;
+
+  /* cartes : entrée une fois, puis on ne touche plus au DOM */
+  const cards = [...document.querySelectorAll(".card")].map(el => ({
+    el, entered:false, settled:false, o:0, ty:22
+  }));
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(en => {
+      if(en.isIntersecting){
+        const c = cards.find(x => x.el === en.target);
+        if(c) c.entered = true;
+        io.unobserve(en.target);
+      }
+    });
+  }, {threshold:0.12, rootMargin:"0px 0px -30px 0px"});
+  cards.forEach(c => io.observe(c.el));
+
+  let inRX = 0, inRY = 0, curRX = 0, curRY = 0;
+  let spinTarget = 0, spinCur = 0;
+  let hasInput = false;
+  const t0 = performance.now();
+
+  medal.addEventListener("click", () => { spinTarget += 360; fireWaves(); });
+
+  window.addEventListener("deviceorientation", e => {
+    if(e.beta === null || e.gamma === null) return;
+    hasInput = true;
+    inRY = Math.max(-18, Math.min(18, e.gamma / 3));
+    inRX = Math.max(-14, Math.min(14, -(e.beta - 45) / 4));
+  });
+
+  function pointerTilt(x, y){
+    const rect = medal.getBoundingClientRect();
+    const dx = (x - (rect.left + rect.width/2)) / (rect.width/2);
+    const dy = (y - (rect.top + rect.height/2)) / (rect.height/2);
+    inRY = Math.max(-1, Math.min(1, dx)) * 16;
+    inRX = Math.max(-1, Math.min(1, -dy)) * 12;
+    hasInput = true;
+  }
+  stage.addEventListener("pointermove", e => pointerTilt(e.clientX, e.clientY));
+  stage.addEventListener("touchmove", e => {
+    if(e.touches.length) pointerTilt(e.touches[0].clientX, e.touches[0].clientY);
+  }, {passive:true});
+  stage.addEventListener("pointerleave", () => { hasInput = false; });
+  stage.addEventListener("touchend", () => { hasInput = false; });
+
+  function loop(now){
+    const t = (now - t0) / 1000;
+    const scrollY = window.scrollY;
+
+    /* pièce : flottement au repos, capteur sinon */
+    const idleRX = Math.sin(t * 0.7) * 3;
+    const idleRY = Math.cos(t * 0.55) * 4;
+    const targetRX = hasInput ? inRX : idleRX;
+    const targetRY = hasInput ? inRY : idleRY;
+    curRX += (targetRX - curRX) * 0.07;
+    curRY += (targetRY - curRY) * 0.07;
+    spinCur += (spinTarget - spinCur) * 0.06;
+    medal.style.transform = `rotateX(${curRX.toFixed(2)}deg) rotateY(${(curRY + spinCur).toFixed(2)}deg)`;
+
+    /* reflet métal : la bande de lumière glisse à contre-sens */
+    sheen.style.setProperty("--sa", (115 + curRY * 2.5).toFixed(1) + "deg");
+    sheen.style.transform = `translateZ(40px) translate(${(curRY * 1.4).toFixed(1)}px, ${(-curRX * 1.4).toFixed(1)}px)`;
+
+    /* ombre de contact : suit l'inclinaison, reste sous la pièce */
+    shadow.style.transform = `translateZ(-46px) translateX(${(-curRY * 1.4).toFixed(1)}px) scaleX(${(1 - Math.abs(curRX) / 80).toFixed(3)})`;
+    shadow.style.opacity = (0.10 + Math.abs(curRX) / 180).toFixed(3);
+
+    /* hero entier : parallaxe au scroll (ombre et ondes suivent) */
+    const p = Math.min(scrollY / 520, 1);
+    hero3d.style.transform = `translateY(${(scrollY * 0.26).toFixed(1)}px) scale(${(1 - p * 0.2).toFixed(3)}) rotateX(${(p * -8).toFixed(1)}deg)`;
+    hero3d.style.opacity = (1 - p * 0.5).toFixed(3);
+
+    /* cartes : fondu + montée, une seule fois, puis figées */
+    for(const c of cards){
+      if(c.settled) continue;
+      if(!c.entered) continue;
+      c.o += (1 - c.o) * 0.10;
+      c.ty += (0 - c.ty) * 0.10;
+      if(c.o > 0.995 && Math.abs(c.ty) < 0.15){
+        c.o = 1; c.ty = 0; c.settled = true;
+        c.el.style.opacity = "1";
+        c.el.style.transform = "none";
+        continue;
+      }
+      c.el.style.opacity = c.o.toFixed(3);
+      c.el.style.transform = `translateY(${c.ty.toFixed(1)}px)`;
+    }
+
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+}
+
+/* ============ barre flottante ============ */
+function initMinibar(){
+  const minibar = document.getElementById("minibar");
+  const stageEl = document.getElementById("stage");
+  function onScroll(){
+    const th = stageEl.offsetTop + stageEl.offsetHeight - 30;
+    minibar.classList.toggle("show", window.scrollY > th);
+  }
+  window.addEventListener("scroll", onScroll, {passive:true});
+  onScroll();
+  minibar.addEventListener("click", () => window.scrollTo({top:0, behavior: reducedMotion ? "auto" : "smooth"}));
+}
+
+/* ============ app ============ */
+async function main(){
+  const now = new Date();
+  document.getElementById("dateLine").textContent =
+    now.toLocaleDateString("fr-FR", {day:"2-digit", month:"2-digit"}) + " · " +
+    now.toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"});
+
+  const h = now.getHours();
+  let greet;
+  if(h < 6) greet = "Il est tard… ou très tôt.";
+  else if(h < 12) greet = "Bonjour. Voici ta dose du matin.";
+  else if(h < 18) greet = "Petite pause scan.";
+  else if(h < 23) greet = "Fin de journée.";
+  else greet = "Encore debout ?";
+  document.getElementById("greet").textContent = greet;
+
+  await detectMode();
+  await loadKey(S_SCANS, []);
+  await loadKey(S_JOURNAL, {});
+  await loadKey(S_TODOS, []);
+  await loadKey(S_LINKS, []);
+  await loadKey(S_LASTCARD, -1);
+  await loadKey(S_METEO, null);
+
+  const scans = getData(S_SCANS);
+  const last = scans.length ? new Date(scans[scans.length - 1]).getTime() : 0;
+  const isNewScan = (now.getTime() - last) > SCAN_COOLDOWN_MS;
+  if(isNewScan){
+    scans.push(now.toISOString());
+    await saveKey(S_SCANS);
+  }
+
+  const total = scans.length;
+  countUp(document.getElementById("scanCount"), total, 600);
+  countUp(document.getElementById("statTotal"), total);
+
+  if(isNewScan){
+    const hit = ACHIEVEMENTS.find(a => a.n === total);
+    if(hit) toast(`Palier débloqué — ${hit.label} ✓`);
+  }
+
+  const lastIdx = getData(S_LASTCARD);
+  let idx = Math.floor(Math.random() * CARDS.length);
+  while(CARDS.length > 1 && idx === lastIdx){
+    idx = Math.floor(Math.random() * CARDS.length);
+  }
+  cache[S_LASTCARD] = idx;
+  saveKey(S_LASTCARD);
+  document.getElementById("cardText").textContent = CARDS[idx].c;
+  document.getElementById("cardTag").textContent = CARDS[idx].t;
+
+  const lvl = levelFromScans(total);
+  countUp(document.getElementById("lvlNum"), lvl.level, 900);
+  document.getElementById("lvlTitle").textContent = lvl.title;
+  let frac = lvl.nextMin === null ? 1 : (total - lvl.min) / (lvl.nextMin - lvl.min);
+  frac = Math.min(Math.max(frac, 0), 1);
+  buildRing(frac);
+  const xpBase = lvl.nextMin !== null
+    ? `${total} scans — encore ${lvl.nextMin - total} avant le niveau ${lvl.level + 1}`
+    : `${total} scans — niveau max atteint`;
+  document.getElementById("xpSub").textContent = isNewScan ? xpBase : xpBase + " · scan récent, non recompté";
+
+  document.getElementById("mbText").textContent = `NIV ${lvl.level} · ${total} scan${total > 1 ? "s" : ""}`;
+
+  initEngine();
+  initMinibar();
+  initWeather();
+
+  const dayset = new Set(scans.map(s => dayKeyOf(s)));
+  const {current, best} = computeStreaks(dayset);
+  countUp(document.getElementById("statStreak"), current);
+  countUp(document.getElementById("statBest"), best);
+
+  const hourCounts = {};
+  scans.forEach(s => { const hh = new Date(s).getHours(); hourCounts[hh] = (hourCounts[hh] || 0) + 1; });
+  let favHour = null, favCount = -1;
+  Object.entries(hourCounts).forEach(([hh, c]) => { if(c > favCount){ favCount = c; favHour = hh; } });
+  document.getElementById("statHour").textContent = favHour !== null ? `${favHour}h` : "—";
+
+  const heat = document.getElementById("heatmap");
+  heat.innerHTML = "";
+  const countByDay = {};
+  scans.forEach(s => { const k = dayKeyOf(s); countByDay[k] = (countByDay[k] || 0) + 1; });
+  let di = 0;
+  for(let i=90;i>=0;i--){
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const c = countByDay[todayKey(d)] || 0;
+    const dot = document.createElement("div");
+    dot.className = "hdot" + (c >= 4 ? " l3" : c >= 2 ? " l2" : c >= 1 ? " l1" : "");
+    dot.style.animationDelay = (0.4 + di * 0.004) + "s";
+    heat.appendChild(dot);
+    di++;
+  }
+
+  const achList = document.getElementById("achList");
+  achList.innerHTML = "";
+  ACHIEVEMENTS.forEach(a => {
+    const row = document.createElement("div");
+    const unlocked = total >= a.n;
+    row.className = "ach-row " + (unlocked ? "unlocked" : "locked");
+    row.innerHTML = `<span class="ach-badge">✓</span><span class="ach-name">${a.label}</span><span class="card-meta">${a.n}</span>`;
+    achList.appendChild(row);
+  });
+
+  const tKey = todayKey();
+  const jInput = document.getElementById("journalInput");
+  jInput.value = getData(S_JOURNAL)[tKey] || "";
+
+  function renderJournalHistory(){
+    const j = getData(S_JOURNAL);
+    const hist = document.getElementById("journalHistory");
+    const entries = Object.entries(j)
+      .filter(([date, text]) => date !== tKey && text && text.trim() !== "")
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .slice(0, 5);
+    if(entries.length === 0){ hist.hidden = true; return; }
+    hist.hidden = false;
+    hist.innerHTML = entries.map(([date, text]) => {
+      const d = new Date(date + "T12:00:00");
+      const label = d.toLocaleDateString("fr-FR", {weekday:"short", day:"2-digit", month:"2-digit"});
+      return `<div class="jh-row"><span class="jh-date">${label}</span><span class="jh-text">${escapeHtml(text)}</span></div>`;
+    }).join("");
+  }
+  renderJournalHistory();
+
+  document.getElementById("journalSave").addEventListener("click", async () => {
+    getData(S_JOURNAL)[tKey] = jInput.value;
+    await saveKey(S_JOURNAL);
+    const note = document.getElementById("journalNote");
+    note.textContent = "Enregistré ✓";
+    setTimeout(() => { note.textContent = ""; }, 2000);
+    renderJournalHistory();
+  });
+
+  function renderTodos(){
+    const todos = getData(S_TODOS);
+    const list = document.getElementById("todoList");
+    const clearBtn = document.getElementById("clearDone");
+    clearBtn.hidden = !todos.some(t => t.done);
+    list.innerHTML = "";
+    if(todos.length === 0){
+      list.innerHTML = `<div class="empty">Rien pour l'instant.</div>`;
+      return;
+    }
+    todos.forEach(t => {
+      const row = document.createElement("div");
+      row.className = "todo-item";
+      row.innerHTML = `
+        <button class="chk ${t.done ? "on" : ""}" data-id="${t.id}" aria-label="Cocher">${t.done ? "✓" : ""}</button>
+        <div class="todo-text ${t.done ? "done" : ""}">${escapeHtml(t.text)}</div>
+        <button class="del" data-id="${t.id}" aria-label="Supprimer">✕</button>`;
+      list.appendChild(row);
+    });
+    list.querySelectorAll(".chk").forEach(el => {
+      el.addEventListener("click", async () => {
+        const todos = getData(S_TODOS);
+        const i = todos.findIndex(x => String(x.id) === el.dataset.id);
+        if(i > -1){ todos[i].done = !todos[i].done; await saveKey(S_TODOS); renderTodos(); }
+      });
+    });
+    list.querySelectorAll(".del").forEach(el => {
+      el.addEventListener("click", async () => {
+        const todos = getData(S_TODOS);
+        const i = todos.findIndex(x => String(x.id) === el.dataset.id);
+        if(i > -1){ todos.splice(i, 1); await saveKey(S_TODOS); renderTodos(); }
+      });
+    });
+  }
+  document.getElementById("clearDone").addEventListener("click", async () => {
+    const todos = getData(S_TODOS);
+    for(let i = todos.length - 1; i >= 0; i--){ if(todos[i].done) todos.splice(i, 1); }
+    await saveKey(S_TODOS);
+    renderTodos();
+  });
+  document.getElementById("todoAdd").addEventListener("click", async () => {
+    const input = document.getElementById("todoInput");
+    const val = input.value.trim();
+    if(!val) return;
+    getData(S_TODOS).push({id: Date.now(), text: val, done: false});
+    await saveKey(S_TODOS);
+    input.value = "";
+    renderTodos();
+  });
+  document.getElementById("todoInput").addEventListener("keydown", e => {
+    if(e.key === "Enter") document.getElementById("todoAdd").click();
+  });
+  renderTodos();
+
+  /* liens gérables, zéro placeholder */
+  let manage = false;
+
+  function normalizeUrl(u){
+    u = (u || "").trim();
+    if(!u) return "";
+    if(!/^https?:\/\//i.test(u)) u = "https://" + u;
+    return u;
+  }
+
+  function renderLinks(){
+    const links = getData(S_LINKS);
+    const grid = document.getElementById("linksGrid");
+    const manageBtn = document.getElementById("manageLinks");
+    manageBtn.hidden = links.length === 0;
+    manageBtn.textContent = manage ? "terminé" : "gérer";
+    grid.innerHTML = "";
+
+    links.forEach(l => {
+      const a = document.createElement("a");
+      a.className = "link-chip";
+      if(manage){
+        a.innerHTML = `<span>${escapeHtml(l.label)}</span><span class="rmv" data-id="${l.id}">✕</span>`;
+        a.addEventListener("click", e => {
+          if(e.target.classList.contains("rmv")) return;
+          e.preventDefault();
+          editLink(l.id);
+        });
+      }else{
+        a.href = l.url;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.innerHTML = `<span>${escapeHtml(l.label)}</span>`;
+      }
+      grid.appendChild(a);
+    });
+
+    const add = document.createElement("a");
+    add.className = "link-chip add";
+    add.innerHTML = "<span>+ ajouter</span>";
+    add.addEventListener("click", e => { e.preventDefault(); addLink(); });
+    grid.appendChild(add);
+
+    grid.querySelectorAll(".rmv").forEach(el => {
+      el.addEventListener("click", async e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const links = getData(S_LINKS);
+        const i = links.findIndex(x => String(x.id) === el.dataset.id);
+        if(i > -1){ links.splice(i, 1); await saveKey(S_LINKS); renderLinks(); }
+      });
+    });
+  }
+
+  async function addLink(){
+    const label = prompt("Nom du lien (ex : LSMC, GitHub, Notion…) :");
+    if(label === null || label.trim() === "") return;
+    const url = normalizeUrl(prompt(`URL pour "${label.trim()}" :`, "https://"));
+    if(!url) return;
+    getData(S_LINKS).push({id: Date.now(), label: label.trim(), url});
+    await saveKey(S_LINKS);
+    renderLinks();
+  }
+
+  async function editLink(id){
+    const links = getData(S_LINKS);
+    const i = links.findIndex(x => String(x.id) === String(id));
+    if(i === -1) return;
+    const label = prompt("Nom du lien :", links[i].label);
+    if(label === null) return;
+    const url = normalizeUrl(prompt("URL :", links[i].url));
+    if(!url) return;
+    links[i].label = label.trim() || links[i].label;
+    links[i].url = url;
+    await saveKey(S_LINKS);
+    renderLinks();
+  }
+
+  document.getElementById("manageLinks").addEventListener("click", () => {
+    manage = !manage;
+    renderLinks();
+  });
+  renderLinks();
+}
+
+window.addEventListener("error", () => {
+  document.querySelectorAll(".card").forEach(c => {
+    c.style.opacity = "1";
+    c.style.transform = "none";
+  });
+});
+
+main();
+</script>
+</body>
+</html>
