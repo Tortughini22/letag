@@ -19,9 +19,6 @@ SUPPORT_URL="https://www.debian.org/support"
 BUG_REPORT_URL="https://bugs.debian.org/"
 EOT
 
-# Sous Debian 13, /etc/os-release est un fichier distinct : on le détourne
-# aussi et on le remplace par un lien vers /usr/lib/os-release.
-if [ -f /etc/os-release ] && [ ! -L /etc/os-release ]; then
-	dpkg-divert --package letag --divert /etc/os-release.debian --rename --add /etc/os-release
-fi
-ln -sf ../usr/lib/os-release /etc/os-release
+# /etc/os-release (fichier distinct sous Debian 13, détourné temporairement par
+# live-build pendant la construction) est remplacé au démarrage par un lien vers
+# /usr/lib/os-release : voir /etc/tmpfiles.d/letag-os-release.conf.

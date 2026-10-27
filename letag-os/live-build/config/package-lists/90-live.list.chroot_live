@@ -7,5 +7,7 @@ user-setup
 live-tools
 calamares
 calamares-settings-debian
+# unsquashfs : copie du système sur le disque (seulement « recommandé » par calamares)
+squashfs-tools
 # Récupération / diagnostic depuis la clé USB
 gparted

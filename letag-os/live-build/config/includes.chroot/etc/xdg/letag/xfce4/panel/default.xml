@@ -14,6 +14,15 @@
       <property name="size" type="uint" value="40"/>
       <property name="icon-size" type="uint" value="24"/>
       <property name="enable-struts" type="bool" value="true"/>
+      <!-- Fond uni opaque : sans compositeur, un fond « thème » (transparent)
+           rend invisibles les icônes de la zone de notification. -->
+      <property name="background-style" type="uint" value="1"/>
+      <property name="background-rgba" type="array">
+        <value type="double" value="0.937"/>
+        <value type="double" value="0.937"/>
+        <value type="double" value="0.929"/>
+        <value type="double" value="1"/>
+      </property>
       <property name="plugin-ids" type="array">
         <value type="int" value="1"/>
         <value type="int" value="2"/>
@@ -72,7 +81,6 @@
     </property>
     <property name="plugin-5" type="string" value="systray">
       <property name="square-icons" type="bool" value="true"/>
-      <property name="icon-size" type="int" value="18"/>
     </property>
     <property name="plugin-6" type="string" value="pulseaudio">
       <property name="enable-keyboard-shortcuts" type="bool" value="true"/>

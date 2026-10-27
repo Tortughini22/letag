@@ -18,9 +18,11 @@ esac
 
 if [ "$choix" = sombre ]; then
 	gtk=Letag-Sombre; icones=Letag-Sombre; sombre=true
+	barre="0.133 0.133 0.129"
 	fond=/usr/share/letag/fonds/letag-sombre.png
 else
 	gtk=Letag-Clair; icones=Letag; sombre=false
+	barre="0.937 0.937 0.929"
 	fond=/usr/share/letag/fonds/letag-clair.png
 fi
 
@@ -32,6 +34,11 @@ regler xsettings /Net/ThemeName string "$gtk"
 regler xsettings /Net/IconThemeName string "$icones"
 regler xfwm4 /general/theme string "$gtk"
 regler xfce4-panel /panels/dark-mode bool "$sombre"
+# Barre à fond uni (voir /etc/xdg/letag/xfce4/panel/default.xml).
+set -- $barre
+xfconf-query -c xfce4-panel -p /panels/panel-1/background-style -n -t uint -s 1 2>/dev/null || true
+xfconf-query -c xfce4-panel -p /panels/panel-1/background-rgba -n \
+	-t double -s "$1" -t double -s "$2" -t double -s "$3" -t double -s 1 2>/dev/null || true
 regler xfce4-terminal /color-use-theme bool true
 
 # Fond d'écran sur chaque écran branché (les noms dépendent de la carte

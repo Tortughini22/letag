@@ -70,7 +70,7 @@ fi
 
 echo "--- Bureau et identité"
 verif "Thèmes Letag-Clair et Letag-Sombre présents" "[ -f /usr/share/themes/Letag-Clair/gtk-3.0/gtk.gresource ] && [ -f /usr/share/themes/Letag-Sombre/gtk-3.0/gtk.gresource ]"
-verif "Icônes Letag (héritent de Papirus)" "grep -q 'Inherits=Papirus' /usr/share/icons/Letag/index.theme"
+verif "Icônes Letag (héritent de Papirus)" "grep -q 'Inherits=Papirus-Light' /usr/share/icons/Letag/index.theme"
 verif "Rendu SVG des icônes (librsvg)" "ls /usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders/ | grep -q svg"
 verif "Police Inter" "fc-list | grep -qi 'Inter'"
 verif "Nom du système : Letag OS" "grep -q '^NAME=\"Letag OS\"' /etc/os-release"

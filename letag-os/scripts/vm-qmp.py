@@ -53,7 +53,7 @@ class QMP:
 
 def touches(q, combo):
     keys = [{"type": "qcode", "data": k} for k in combo.split("-")]
-    q.cmd("send-key", keys=keys, **{"hold-time": 80})
+    q.cmd("send-key", keys=keys, **{"hold-time": 20})
     time.sleep(0.15)
 
 

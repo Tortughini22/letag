@@ -42,7 +42,7 @@ def disques():
 class Installateur(Gtk.Window):
     def __init__(self):
         super().__init__(title="Installer Letag OS")
-        self.set_default_size(640, 600)
+        self.set_default_size(640, 520)
         self.set_icon_name("letag-installer")
         self.set_position(Gtk.WindowPosition.CENTER)
         boite = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
@@ -75,7 +75,7 @@ class Installateur(Gtk.Window):
             vue.append_column(Gtk.TreeViewColumn(t, Gtk.CellRendererText(), text=i))
         vue.expand_all()
         defil = Gtk.ScrolledWindow()
-        defil.set_min_content_height(150)
+        defil.set_min_content_height(90)
         defil.add(vue)
         boite.pack_start(defil, True, True, 0)
 

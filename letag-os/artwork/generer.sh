@@ -37,7 +37,8 @@ for i in 1 2 3; do png "diapo$i.svg" 800 440 "$B/diapo$i.png"; done
 
 echo "== Thèmes d'icônes"
 for t in Letag Letag-Sombre; do
-	parent=Papirus; [ "$t" = Letag-Sombre ] && parent=Papirus-Dark
+	# Papirus-Light : icônes de barre foncées, lisibles sur la barre claire.
+	parent=Papirus-Light; [ "$t" = Letag-Sombre ] && parent=Papirus-Dark
 	d="$INC/usr/share/icons/$t"
 	rm -rf "$d"; mkdir -p "$d/scalable/apps"
 	cat > "$d/index.theme" <<EOT
@@ -56,7 +57,7 @@ Context=Applications
 EOT
 	for n in letag-menu start-here distributor-logo debian-logo letag; do cp "$SRC/logo.svg" "$d/scalable/apps/$n.svg"; done
 	cp "$SRC/centre.svg" "$d/scalable/apps/letag-centre.svg"
-	cp "$SRC/installer.svg" "$d/scalable/apps/letag-installer.svg"
+	for n in letag-installer install-debian calamares; do cp "$SRC/installer.svg" "$d/scalable/apps/$n.svg"; done
 done
 
 echo "== Thèmes GTK (dérivés d'Arc)"

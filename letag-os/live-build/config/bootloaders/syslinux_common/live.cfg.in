@@ -24,7 +24,7 @@ label live-toram
 	append @APPEND_LIVE@ toram
 
 label live-failsafe
-	menu label Mode sans ^echec
+	menu label Mode sans echec (^pilotes minimaux)
 	linux @LINUX@
 	initrd @INITRD@
 	append @APPEND_LIVE_FAILSAFE@

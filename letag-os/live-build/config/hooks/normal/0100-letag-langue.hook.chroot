@@ -8,7 +8,7 @@ update-locale LANG=fr_FR.UTF-8 LANGUAGE=fr_FR:fr
 cat > /etc/default/keyboard <<'EOT'
 XKBMODEL="pc105"
 XKBLAYOUT="fr"
-XKBVARIANT="latin9"
+XKBVARIANT=""
 XKBOPTIONS=""
 BACKSPACE="guess"
 EOT
