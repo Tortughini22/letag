@@ -44,7 +44,7 @@ La session d'essai ne modifie **pas** le disque dur. L'utilisateur est `letag` e
 
 ## 3. Installer
 
-Double-cliquez sur **Installer Letag OS** sur le bureau. Un écran de sécurité liste les disques détectés et rappelle ce que fait chaque mode. Il faut cocher « J'ai sauvegardé… » pour ouvrir l'installateur.
+Double-cliquez sur **Installer Letag OS** sur le bureau. Pendant la session d'essai, l'écran ne se verrouille pas. Un écran de sécurité liste les disques détectés et rappelle ce que fait chaque mode. Il faut cocher « J'ai sauvegardé… » pour ouvrir l'installateur.
 
 L'installateur (Calamares) demande :
 
@@ -54,11 +54,11 @@ L'installateur (Calamares) demande :
    - **Remplacer une partition** : seule la partition choisie est effacée.
    - **Partitionnement manuel** : contrôle complet. Réutilisez une partition `/home` existante **sans** cocher « Formater » pour garder vos fichiers.
    - **Effacer le disque** : supprime **tout** le contenu du disque choisi.
-   - **Swap** : « Pas de swap » est le choix recommandé (la mémoire d'échange compressée zram est déjà active). « Fichier d'échange » ajoute une réserve sur le disque, plus lente.
+   - **Swap** : « Aucun Swap » (choix par défaut) est recommandé (la mémoire d'échange compressée zram est déjà active). « Fichier d'échange » ajoute une réserve sur le disque, plus lente.
 3. **Utilisateur** — nom, mot de passe (il sert aussi pour les tâches d'administration via `sudo`), nom de l'ordinateur.
 4. **Résumé** — toutes les modifications du disque sont listées. **Rien n'est écrit avant de cliquer sur « Installer ».**
 
-L'installation copie le système de la clé vers le disque (environ 10 à 25 minutes sur disque dur et USB 2.0), installe GRUB sur le disque choisi, puis retire les outils propres à la session d'essai.
+L'installation copie le système de la clé vers le disque, installe GRUB sur le disque choisi, puis retire les outils propres à la session d'essai. Elle ne demande pas d'accès Internet. La durée sur le HP reste à mesurer : en machine virtuelle émulée, sans accélération, elle a pris environ 30 minutes.
 
 Retirez la clé au redémarrage.
 
@@ -72,7 +72,7 @@ Retirez la clé au redémarrage.
 
 | Partition | Taille | Rôle |
 |---|---|---|
-| `/` (ext4) | 40 Go | Système et logiciels (environ 7 Go utilisés après installation) |
+| `/` (ext4) | 40 Go | Système et logiciels (3,2 Go utilisés juste après l'installation) |
 | `/home` (ext4) | le reste | Vos documents, séparés du système : une réinstallation peut les conserver |
 
 Une partition unique `/` (choix des modes guidés) fonctionne aussi très bien.

@@ -22,6 +22,7 @@
 ## Bureau : XFCE 4.20 + Xorg
 
 - Bureau complet et francisé : barre des tâches, menu Whisker avec recherche, Thunar, gestionnaire de paramètres. Il est léger, entre 400 et 600 Mo au repos selon les distributions, ce qui reste à mesurer ici.
+- Profil d'effets « Minimal » par défaut : pas de compositeur. La barre a un fond uni, sinon les icônes de notification deviennent invisibles sans compositeur, ce qui a été constaté en test. Le profil « Équilibré » active le compositeur xfwm4.
 - Son compositeur xfwm4 est **désactivable** à chaud. Il fonctionne en XRender, sans OpenGL, ce qui est peu exigeant pour la carte graphique.
 - **Xorg plutôt que Wayland** : sur nouveau/Tesla, Wayland dépend d'une accélération OpenGL fragile, alors que Xorg dispose de replis éprouvés (VESA, fbdev, shadowfb).
 - Écartés : GNOME et KDE Plasma (trop gourmands pour 4 Go avec un navigateur ouvert, compositeur OpenGL obligatoire) ; LXQt (correct, mais moins cohérent en GTK avec Firefox et LibreOffice).
@@ -51,6 +52,8 @@ Palette reprise du projet « LE TAG » du même dépôt : fond `#F3F3F1`, encre 
 | journald | 64 Mo maximum, écriture différée de 10 min | Moins d'écritures disque. |
 | apt-daily, man-db | `Nice=19`, E/S « idle » | Tâches de fond invisibles. |
 | `NetworkManager-wait-online` | désactivé | Démarrage plus rapide. |
+| `unattended-upgrades.service` | désactivé (le minuteur `apt-daily-upgrade` reste actif) | Ce service ne sert qu'à retarder l'arrêt et garde un processus Python d'environ 30 Mo. |
+| Caches d'icônes et de polices | régénérés à la construction et vérifiés à chaque démarrage | Sans eux, chaque application GTK consommait 60 à 90 Mo de plus (mesuré). |
 | Paquets recommandés | non installés (`APT::Install-Recommends false`) | Évite les dépendances superflues. |
 | Firefox | 4 processus, onglets déchargés si la mémoire manque, H.264 préféré | Mémoire et charge processeur. |
 
@@ -60,5 +63,6 @@ Palette reprise du projet « LE TAG » du même dépôt : fond `#F3F3F1`, encre 
 
 - **Calamares** démarre **sans aucune option de partitionnement présélectionnée**. Il est précédé d'un écran Letag qui liste les disques et exige de confirmer la sauvegarde. Rien n'est écrit avant la validation du résumé, et le système n'efface jamais un disque de lui-même.
 - La session live ne monte ni n'active le swap du disque interne (comportement par défaut de live-boot).
+- En mode secours (`nomodeset`, pilote VESA), Xorg démarre sans l'extension RANDR (`letag-xserveur`), car il plantait à l'ouverture de la session XFCE (constaté en test).
 - GRUB détecte les autres systèmes (os-prober) et ajoute un sous-menu **« Letag OS — dépannage »** : affichage de secours, affichage sans accélération, console de récupération. Les entrées de récupération de Debian restent disponibles.
 - La clé USB fait office de **support de secours** : `letag-secours` (réinstaller GRUB, réinitialiser l'affichage, chroot), GParted, TestDisk/PhotoRec et memtest86+.

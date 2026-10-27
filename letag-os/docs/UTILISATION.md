@@ -62,7 +62,7 @@ La Quadro FX 380 utilise le pilote libre **nouveau**. Le pilote NVIDIA 340.xx, l
 | `sans-accel` | L'écran se fige ou clignote : nouveau sans aucune accélération. |
 | `secours` | L'écran reste noir : pilote VESA générique (lent, résolution parfois limitée). |
 
-Le changement prend effet au redémarrage. **Si l'écran reste noir au démarrage**, choisissez dans le menu GRUB **« Letag OS — dépannage » → « Affichage de secours »**, connectez-vous, puis choisissez un autre mode.
+Le changement prend effet au redémarrage. En mode `secours`, l'extension RANDR de Xorg est désactivée (le pilote VESA plante sans cela) : l'outil « Écrans » ne permet alors pas de changer la résolution. **Si l'écran reste noir au démarrage**, choisissez dans le menu GRUB **« Letag OS — dépannage » → « Affichage de secours »**, connectez-vous, puis choisissez un autre mode.
 
 ## Mémoire et performances
 
@@ -74,7 +74,8 @@ Le changement prend effet au redémarrage. **Si l'écran reste noir au démarrag
 Pour mesurer la mémoire utilisée :
 
 ```
-letag-mesure
+letag-mesure                # résumé
+sudo letag-mesure --detail  # part réelle (PSS) de chaque programme
 ```
 
 Conseils : évitez d'ouvrir plus de 10 à 15 onglets à la fois ; préférez la vidéo en 720p ou 1080p à 30 images/s.

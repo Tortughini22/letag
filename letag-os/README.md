@@ -19,6 +19,7 @@ letag-os/
 │   ├── recolorer-arc.py     dérive les thèmes GTK Letag-Clair/Sombre d'Arc
 │   └── generer.sh           produit PNG, thèmes, icônes et guide HTML
 ├── docs/                    documentation (le guide HTML embarqué en est issu)
+│   └── captures/            captures d'écran des tests en machine virtuelle
 ├── live-build/              configuration live-build de l'image
 │   ├── auto/config          options : Debian 13, BIOS+UEFI, zstd, français…
 │   └── config/
@@ -36,6 +37,8 @@ letag-os/
 │           │                        letag-maj, letag-session, letag-installer
 │           ├── usr/local/sbin/      letag-secours
 │           └── usr/share/letag/calamares/  scripts d'installation (GRUB, dépôts)
+├── tests/
+│   └── verifier-systeme.sh  34 contrôles automatiques (VM ou HP réel)
 └── scripts/
     ├── construire.sh        construction reproductible de l'ISO
     ├── creer-cle-usb.sh     écriture sécurisée sur clé USB
@@ -61,6 +64,8 @@ sudo ./scripts/construire.sh
 Pour reconstruire uniquement les éléments visuels (sur Debian 13) : `sh artwork/generer.sh`.
 
 ## Tester en machine virtuelle
+
+Compte rendu complet : [docs/TESTS.md](docs/TESTS.md). Captures : [docs/captures/](docs/captures/).
 
 ```
 ./scripts/tester-vm.sh live                     # session d'essai
