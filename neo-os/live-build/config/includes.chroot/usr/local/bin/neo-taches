@@ -319,10 +319,16 @@ class Gestionnaire(Gtk.Window):
         self.etat.set_margin_bottom(6)
         boite.pack_start(self.etat, False, False, 0)
         self.connect("key-press-event", self.touche)
+        # Mesures en priorité basse : l'affichage et le clavier passent toujours
+        # avant, même sur une machine lente ou très chargée (fenêtre jamais figée).
+        GLib.idle_add(self.demarrer_mesures, priority=GLib.PRIORITY_LOW)
+
+    def demarrer_mesures(self):
         self.rafraichir_processus()
         self.tic()
-        GLib.timeout_add(1000, self.tic)
-        GLib.timeout_add(2000, self.rafraichir_processus)
+        GLib.timeout_add(1000, self.tic, priority=GLib.PRIORITY_LOW)
+        GLib.timeout_add(2000, self.rafraichir_processus, priority=GLib.PRIORITY_LOW)
+        return False
 
     # ---- Processus ----
     def page_processus(self):
@@ -505,9 +511,10 @@ class Gestionnaire(Gtk.Window):
                 if profondeur == 2 and not cp.startswith("app:"):
                     continue
                 if cle in self.iters:
-                    for n, x in enumerate(v):
-                        if self.store[self.iters[cle]][n] != x:
-                            self.store[self.iters[cle]][n] = x
+                    ligne = self.store[self.iters[cle]]
+                    cols = [n for n, x in enumerate(v) if ligne[n] != x]
+                    if cols:  # une seule notification (et un seul tri) par ligne
+                        self.store.set(self.iters[cle], cols, [v[n] for n in cols])
                 elif cp is None or cp in self.iters:
                     self.iters[cle] = self.store.append(self.iters.get(cp), v)
         if premier:

@@ -9,6 +9,24 @@ SHA-256 4075b6318b683decda254e7ba5b740f5ed819a0f5608a97378f7d2a047877c70
 
 Cette image a été construite par `scripts/construire.sh` (live-build Debian 13, dans un chroot debootstrap). Le dépôt ne contient pas l'ISO : il faut la reconstruire (voir le README). Une nouvelle construction télécharge les paquets du jour (mises à jour de sécurité), donc la somme de contrôle changera.
 
+## Version 1.0 « Néo » (palette, animations, outils) — état des tests
+
+Image remise au testeur : voir la somme SHA-256 dans `neo-os-1.0-amd64.iso.sha256`, livrée avec l'image.
+
+Vérifié en VM (QEMU Westmere sans AVX, 4 Go, BIOS) :
+
+| Test | Résultat |
+|---|---|
+| Démarrage BIOS jusqu'au bureau Néo (fond, barre menthe clair, icônes) | ✅ |
+| picom lancé avec le profil « complètes » (`neo-animations etat`) | ✅ |
+| Mémoire en session live, terminal ouvert, animations complètes (`free -m`) | 721 Mo utilisés, 3 199 Mo disponibles (VM, pilote QXL) |
+| Ctrl+Shift+Échap ouvre le gestionnaire des tâches | ✅ |
+| Gestionnaire des tâches : Applications / arrière-plan / système, processus protégés | ✅ après correction (voir ci-dessous) |
+
+**Défaut trouvé puis corrigé** : dans la VM émulée, le gestionnaire des tâches ouvrait sa fenêtre sans jamais la dessiner. Ses mesures périodiques passaient avant l'affichage et saturaient le processeur émulé. Elles tournent désormais en priorité basse, et chaque ligne est mise à jour en une seule fois. Après correction : fenêtre affichée et réactive, 22 % de processeur en émulation, 6 % sur un processeur réel du conteneur. L'image livrée contient ce correctif (squashfs régénéré avec les mêmes options : zstd 19, blocs de 128 Kio).
+
+**Pas encore vérifié dans cette version** (confié au testeur, voir `TESTEUR.md`) : chaque raccourci, Libérer de la RAM, Thunar, Diagnostic, Discord, mesures avec et sans animations et avec Firefox + Discord, installation complète, mode secours. Les résultats plus bas concernent la version précédente, aux fonctions communes identiques (installation, GRUB, secours VESA).
+
 ## Environnement de test
 
 | Élément | Machine virtuelle | HP Z200 réel |
