@@ -23,6 +23,8 @@ lshw
 dmidecode
 psmisc
 procps
+# hwclock (réglage de l'horloge matérielle à l'installation)
+util-linux-extra
 iproute2
 iputils-ping
 # Microcode Intel (correctifs de sécurité du processeur, dépôt non-free-firmware)

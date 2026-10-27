@@ -61,7 +61,7 @@ case "$choix" in
 		;;
 	2)
 		monter
-		LETAG_DANS_CHROOT=1 chroot "$CIBLE" /usr/local/sbin/letag-graphique auto
+		LETAG_DANS_CHROOT=1 chroot "$CIBLE" /usr/local/bin/letag-graphique auto
 		;;
 	3)
 		monter

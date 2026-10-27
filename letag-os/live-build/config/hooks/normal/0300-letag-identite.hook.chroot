@@ -22,3 +22,10 @@ EOT
 # /etc/os-release (fichier distinct sous Debian 13, détourné temporairement par
 # live-build pendant la construction) est remplacé au démarrage par un lien vers
 # /usr/lib/os-release : voir /etc/tmpfiles.d/letag-os-release.conf.
+
+# Fond d'écran par défaut de XFCE (utilisé quand l'écran n'a pas de réglage
+# propre, par exemple en mode secours sans RANDR) : remplacé par le fond Letag.
+if [ -f /usr/share/backgrounds/xfce/xfce-x.svg ] && ! dpkg-divert --list /usr/share/backgrounds/xfce/xfce-x.svg | grep -q letag; then
+	dpkg-divert --package letag --divert /usr/share/backgrounds/xfce/xfce-x.svg.xfce --rename --add /usr/share/backgrounds/xfce/xfce-x.svg
+fi
+ln -sf ../letag/fond-clair.svg /usr/share/backgrounds/xfce/xfce-x.svg

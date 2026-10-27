@@ -1,0 +1,6 @@
+[Desktop Entry]
+# Letag OS : masqué du menu (Celluloid sert de lecteur vidéo, mpv reste utilisable)
+Type=Application
+Name=mpv
+Exec=mpv --player-operation-mode=pseudo-gui -- %U
+NoDisplay=true

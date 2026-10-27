@@ -24,7 +24,17 @@ fi
 
 letag-theme appliquer
 
-# Session live : icône « Installer Letag OS » sur le bureau.
+# Session live : pas de verrouillage ni de mise en veille de l'écran (une
+# installation dure plusieurs minutes et le mot de passe « live » n'est pas
+# connu de tous), et icône « Installer Letag OS » sur le bureau.
+if [ -d /run/live/medium ]; then
+	xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/dpms-enabled -n -t bool -s false 2>/dev/null
+	xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/blank-on-ac -n -t int -s 0 2>/dev/null
+	xfconf-query -c xfce4-session -p /shutdown/LockScreen -n -t bool -s false 2>/dev/null
+	xset s off -dpms 2>/dev/null
+	# light-locker peut démarrer après ce script : on l'arrête un peu plus tard.
+	(sleep 30; pkill -u "$(id -u)" -x light-locker) >/dev/null 2>&1 &
+fi
 if [ -d /run/live/medium ] && [ -x /usr/local/bin/letag-installer ]; then
 	bureau="$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")"
 	mkdir -p "$bureau"

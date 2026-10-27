@@ -101,7 +101,7 @@ class Centre(Gtk.Window):
         # --- Affichage -----------------------------------------------------
         cadre = self.section(boite, "Pilote d'affichage")
         self.mode = Gtk.ComboBoxText()
-        actuel = sortie(["/usr/local/sbin/letag-graphique", "etat"]) or "auto"
+        actuel = sortie(["/usr/local/bin/letag-graphique", "etat"]) or "auto"
         for i, (cle, texte) in enumerate(MODES_AFFICHAGE):
             self.mode.append(cle, texte)
             if cle == actuel:
@@ -182,7 +182,7 @@ class Centre(Gtk.Window):
 
     def changer_affichage(self, _w):
         mode = self.mode.get_active_id()
-        r = subprocess.run(["pkexec", "/usr/local/sbin/letag-graphique", mode],
+        r = subprocess.run(["pkexec", "/usr/local/bin/letag-graphique", mode],
                            capture_output=True, text=True)
         self.message(Gtk.MessageType.INFO if r.returncode == 0 else Gtk.MessageType.ERROR,
                      "Mode d'affichage" if r.returncode == 0 else "Échec",

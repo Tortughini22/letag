@@ -1,0 +1,10 @@
+#!/bin/sh
+# Letag OS — lance le serveur X pour LightDM (xserver-command).
+# En mode d'affichage de secours (nomodeset), Xorg utilise le pilote VESA, et
+# celui-ci fait planter Xorg dès qu'une application interroge l'extension RANDR
+# (constaté en test : erreur de segmentation dans RRGetInfo à l'ouverture de la
+# session XFCE). On démarre donc X sans RANDR dans ce seul mode.
+if grep -qw nomodeset /proc/cmdline; then
+	exec /usr/bin/X -extension RANDR "$@"
+fi
+exec /usr/bin/X "$@"

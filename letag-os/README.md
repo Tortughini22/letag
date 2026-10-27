@@ -32,8 +32,9 @@ letag-os/
 │           ├── etc/default/grub.d, etc/grub.d/42_letag_depannage
 │           ├── etc/firefox, usr/lib/firefox-esr/defaults/pref/letag.js
 │           ├── usr/local/bin/       letag-centre, letag-theme, letag-effets, letag-mesure,
+│           │                        letag-graphique, letag-xserveur,
 │           │                        letag-maj, letag-session, letag-installer
-│           ├── usr/local/sbin/      letag-graphique, letag-secours
+│           ├── usr/local/sbin/      letag-secours
 │           └── usr/share/letag/calamares/  scripts d'installation (GRUB, dépôts)
 └── scripts/
     ├── construire.sh        construction reproductible de l'ISO

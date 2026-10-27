@@ -9,5 +9,8 @@ calamares
 calamares-settings-debian
 # unsquashfs : copie du système sur le disque (seulement « recommandé » par calamares)
 squashfs-tools
+# Diaporama de l'installateur (modules QML Qt 6)
+qml6-module-qtquick
+qml6-module-qtquick-window
 # Récupération / diagnostic depuis la clé USB
 gparted
