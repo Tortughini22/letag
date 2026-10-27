@@ -11,13 +11,13 @@ Cette image a été construite par `scripts/construire.sh` (live-build Debian 13
 
 ## Version 1.0 « Néo » (palette, animations, outils) — état des tests
 
-Image remise au testeur : voir la somme SHA-256 dans `neo-os-1.0-amd64.iso.sha256`, livrée avec l'image.
+Image remise au testeur : `neo-os-1.0-amd64.iso`, 1 265 434 624 octets, SHA-256 `151d0d05c2aca3a6694dbbf6cdaa422d0556e8d9a1749d8dda2c3f8c6257023e`.
 
 Vérifié en VM (QEMU Westmere sans AVX, 4 Go, BIOS) :
 
 | Test | Résultat |
 |---|---|
-| Démarrage BIOS jusqu'au bureau Néo (fond, barre menthe clair, icônes) | ✅ |
+| Démarrage BIOS jusqu'au bureau Néo, image lue comme DVD **et** comme clé USB (image hybride, comme après `dd`) | ✅ |
 | picom lancé avec le profil « complètes » (`neo-animations etat`) | ✅ |
 | Mémoire en session live, terminal ouvert, animations complètes (`free -m`) | 721 Mo utilisés, 3 199 Mo disponibles (VM, pilote QXL) |
 | Ctrl+Shift+Échap ouvre le gestionnaire des tâches | ✅ |
