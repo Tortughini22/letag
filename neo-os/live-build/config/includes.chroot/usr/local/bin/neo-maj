@@ -1,0 +1,51 @@
+#!/bin/sh
+# neo-maj — met à jour tout le système (paquets Debian, sécurité comprise) et
+# Discord s'il est installé. Les correctifs de sécurité s'installent déjà seuls
+# chaque jour ; cet outil applique aussi les autres. En cas de problème, un
+# message avec un code NEO-MAJ-xxx explique la cause et la solution.
+set -u
+if [ "$(id -u)" -ne 0 ]; then
+	exec pkexec env DISPLAY="${DISPLAY:-}" XAUTHORITY="${XAUTHORITY:-}" NEO_UTILISATEUR="$(id -un)" /usr/local/bin/neo-maj "$@"
+fi
+erreur() { neo-erreur "$1" ${2:+--details "$2"}; echo; echo "Mise à jour interrompue."; exit 1; }
+export DEBIAN_FRONTEND=readline
+
+libre=$(df -Pm / | awk 'NR==2 {print $4}')
+[ "${libre:-0}" -lt 800 ] && erreur NEO-MAJ-103 "${libre} Mo libres sur /"
+if fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock >/dev/null 2>&1; then
+	erreur NEO-MAJ-102 "$(ps -o comm= -p "$(fuser /var/lib/dpkg/lock-frontend 2>/dev/null | awk '{print $1}')" 2>/dev/null)"
+fi
+if ! getent hosts deb.debian.org >/dev/null 2>&1; then
+	erreur NEO-MAJ-101 "deb.debian.org introuvable (DNS)"
+fi
+
+echo "== Recherche des mises à jour…"
+sortie=$(apt-get update 2>&1); rc=$?
+echo "$sortie" | tail -n 5
+if [ $rc -ne 0 ] || echo "$sortie" | grep -qE '^(E|Err):'; then
+	echo "$sortie" | grep -qE 'Could not resolve|Failed to fetch|Temporary failure|Unable to connect' &&
+		erreur NEO-MAJ-101 "$(echo "$sortie" | grep -E '^(E|Err):' | head -n 3)"
+	erreur NEO-MAJ-104 "$(echo "$sortie" | grep -E '^(E|Err):' | head -n 3)"
+fi
+if [ -n "$(ls -A /var/lib/dpkg/updates 2>/dev/null)" ]; then
+	echo "== Reprise d'une installation interrompue…"
+	dpkg --configure -a || erreur NEO-MAJ-004
+fi
+echo
+echo "== Installation…"
+apt-get full-upgrade || erreur NEO-MAJ-104 "apt-get full-upgrade a échoué (code $?)"
+echo
+echo "== Nettoyage…"
+apt-get autoremove --purge -y
+apt-get clean
+if dpkg -s discord >/dev/null 2>&1; then
+	echo
+	echo "== Discord…"
+	neo-discord mettre-a-jour || true
+fi
+if [ -f /var/run/reboot-required ]; then
+	echo
+	neo-erreur NEO-MAJ-003
+fi
+echo
+echo "Terminé : le système est à jour."

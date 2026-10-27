@@ -1,0 +1,123 @@
+#!/bin/sh
+# neo-discord — Discord depuis sa source officielle (discord.com), jamais lancé
+# automatiquement à l'ouverture de session.
+#
+#   neo-discord installer        télécharge le paquet officiel et l'installe
+#   neo-discord mettre-a-jour    réinstalle si discord.com propose une version plus récente
+#   neo-discord desinstaller     retire Discord (les réglages personnels restent)
+#   neo-discord reglages         (utilisateur) « Ouvrir Discord au démarrage » désactivé
+#   neo-discord --depuis FICHIER installe un .deb déjà téléchargé, après vérification
+#
+# Pourquoi Discord n'est pas inclus dans l'image : son paquet ne peut pas être
+# redistribué ; il est téléchargé depuis discord.com sur demande. Le paquet ne
+# contient qu'un lanceur : au premier démarrage, Discord télécharge lui-même
+# son application dans ~/.config/discord et se met ensuite à jour seul.
+set -u
+
+URL_OFFICIELLE="https://discord.com/api/download?platform=linux&format=deb"
+
+verifier_paquet() { # $1 = fichier .deb ; refuse tout ce qui n'est pas le paquet officiel
+	[ "$(dpkg-deb -f "$1" Package 2>/dev/null)" = discord ] || return 1
+	dpkg-deb -f "$1" Maintainer 2>/dev/null | grep -q '@discord\.com>' || return 1
+	[ "$(dpkg-deb -f "$1" Architecture 2>/dev/null)" = amd64 ] || return 1
+	dpkg-deb -c "$1" >/dev/null 2>&1 || return 1
+}
+
+url_courante() { # URL finale du paquet ; doit rester sur un domaine officiel, en HTTPS
+	u=$(curl -sS --max-time 30 -o /dev/null -w '%{redirect_url}' "$URL_OFFICIELLE") || return 1
+	case "$u" in
+		https://*.discordapp.net/apps/linux/*.deb|https://*.discord.com/*.deb|https://discord.com/*.deb) echo "$u" ;;
+		*) return 2 ;;
+	esac
+}
+
+installer_fichier() { # $1 = .deb vérifié (administrateur)
+	if ! verifier_paquet "$1"; then neo-erreur NEO-DIS-002 --details "$1"; return 1; fi
+	echo "Paquet officiel Discord $(dpkg-deb -f "$1" Version) vérifié. Installation…"
+	if ! DEBIAN_FRONTEND=noninteractive apt-get install -y "$1"; then
+		neo-erreur NEO-DIS-003; return 1
+	fi
+	# L'entrée « Installer Discord » du menu laisse la place à celle de Discord.
+	mkdir -p /usr/local/share/applications
+	printf '[Desktop Entry]\nType=Application\nName=Installer Discord\nExec=true\nNoDisplay=true\n' \
+		> /usr/local/share/applications/neo-discord-installer.desktop
+	echo "Discord est installé. Il n'est PAS lancé automatiquement au démarrage."
+	echo "Au premier lancement, Discord télécharge son application (environ 100 Mo)."
+}
+
+telecharger_et_installer() {
+	u=$(url_courante); rc=$?
+	if [ $rc -eq 2 ]; then neo-erreur NEO-DIS-002 --details "redirection inattendue"; return 1; fi
+	if [ $rc -ne 0 ] || [ -z "$u" ]; then neo-erreur NEO-DIS-001; return 1; fi
+	echo "Source officielle : $u"
+	tmp=$(mktemp -d)
+	if ! curl -sSfL --max-time 600 --proto '=https' -o "$tmp/discord.deb" "$u"; then
+		rm -rf "$tmp"; neo-erreur NEO-DIS-001 --details "$u"; return 1
+	fi
+	installer_fichier "$tmp/discord.deb"; rc=$?
+	rm -rf "$tmp"
+	return $rc
+}
+
+en_admin() {
+	if [ "$(id -u)" -ne 0 ]; then
+		exec pkexec /usr/local/bin/neo-discord "$@"
+	fi
+}
+
+case "${1:-}" in
+	installer)
+		en_admin "$@"
+		telecharger_et_installer || exit 1
+		;;
+	--depuis)
+		en_admin "$@"
+		[ -f "${2:-}" ] || { echo "Usage : neo-discord --depuis FICHIER.deb" >&2; exit 2; }
+		installer_fichier "$2" || exit 1
+		;;
+	mettre-a-jour)
+		en_admin "$@"
+		dpkg -s discord >/dev/null 2>&1 || { echo "Discord n'est pas installé."; exit 0; }
+		u=$(url_courante) || { neo-erreur NEO-DIS-001; exit 1; }
+		dispo=$(echo "$u" | sed -n 's#.*/discord-\([0-9.]*\)\.deb#\1#p')
+		actuel=$(dpkg-query -W -f '${Version}' discord)
+		if [ -n "$dispo" ] && dpkg --compare-versions "$dispo" gt "$actuel"; then
+			echo "Discord $actuel → $dispo"
+			telecharger_et_installer || exit 1
+		else
+			echo "Discord $actuel est à jour (l'application se met aussi à jour seule au lancement)."
+		fi
+		;;
+	desinstaller)
+		en_admin "$@"
+		apt-get remove -y discord
+		rm -f /usr/local/share/applications/neo-discord-installer.desktop
+		;;
+	reglages)
+		# Désactive « Ouvrir Discord au démarrage » tant que l'utilisateur ne l'a
+		# pas activé lui-même dans Discord, et retire l'entrée de démarrage
+		# automatique que Discord crée à son premier lancement.
+		f="${XDG_CONFIG_HOME:-$HOME/.config}/discord/settings.json"
+		auto="${XDG_CONFIG_HOME:-$HOME/.config}/autostart/discord.desktop"
+		mkdir -p "$(dirname "$f")"
+		python3 - "$f" "$auto" <<'EOP'
+import json, os, sys
+f, auto = sys.argv[1], sys.argv[2]
+try:
+    with open(f) as fi:
+        d = json.load(fi)
+except (OSError, ValueError):
+    d = {}
+if "OPEN_ON_STARTUP" not in d:
+    d["OPEN_ON_STARTUP"] = False
+    with open(f, "w") as fo:
+        json.dump(d, fo, indent=2)
+if d.get("OPEN_ON_STARTUP") is False and os.path.exists(auto):
+    os.remove(auto)
+EOP
+		;;
+	*)
+		sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+		exit 2
+		;;
+esac

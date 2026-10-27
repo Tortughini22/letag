@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Installer Discord
+GenericName=Messagerie vocale et textuelle
+Comment=Télécharge Discord depuis son site officiel (discord.com) et l'installe
+Exec=xfce4-terminal --hold -T "Installer Discord" -x neo-discord installer
+Icon=discord
+Categories=Network;InstantMessaging;
+Keywords=discord;chat;vocal;

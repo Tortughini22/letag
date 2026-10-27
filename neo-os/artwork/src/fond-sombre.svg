@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <!-- Fond sombre Néo : bleu marine, aplats translucides superposés -->
+  <rect width="1920" height="1080" fill="#0F2B5B"/>
+  <circle cx="1530" cy="930" r="640" fill="#4478AF" fill-opacity="0.45"/>
+  <circle cx="1150" cy="1080" r="380" fill="#91D2BC" fill-opacity="0.35"/>
+  <circle cx="1660" cy="610" r="240" fill="#7DCDAD" fill-opacity="0.85"/>
+  <circle cx="1330" cy="520" r="64" fill="#C6EBD4"/>
+  <circle cx="250" cy="170" r="120" fill="#4478AF" fill-opacity="0.45"/>
+  <circle cx="360" cy="250" r="34" fill="#7DCDAD"/>
+</svg>

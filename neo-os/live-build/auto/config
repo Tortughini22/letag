@@ -1,0 +1,47 @@
+#!/bin/sh
+# Configuration live-build de Néo OS (base Debian 13 « trixie », amd64).
+# Appelé par « lb config » ; ne pas lancer directement.
+set -e
+
+# Miroirs : HTTPS pour le système final. Pendant la construction, un miroir
+# local ou un proxy apt peut être fourni via NEO_MIRROR / NEO_APT_PROXY.
+MIRROR_FINAL="https://deb.debian.org/debian/"
+SECURITY_FINAL="https://security.debian.org/debian-security/"
+MIRROR_BUILD="${NEO_MIRROR:-$MIRROR_FINAL}"
+SECURITY_BUILD="${NEO_SECURITY_MIRROR:-$SECURITY_FINAL}"
+
+# Paramètres du noyau pour la session live (français, AZERTY, Paris).
+APPEND_COMMUN="boot=live components locales=fr_FR.UTF-8 keyboard-layouts=fr timezone=Europe/Paris username=neo user-fullname=Neo hostname=neo"
+
+lb config noauto \
+	--mode debian \
+	--distribution trixie \
+	--architecture amd64 \
+	--archive-areas "main contrib non-free-firmware" \
+	--mirror-bootstrap "$MIRROR_BUILD" \
+	--mirror-chroot "$MIRROR_BUILD" \
+	--mirror-chroot-security "$SECURITY_BUILD" \
+	--mirror-binary "$MIRROR_FINAL" \
+	--mirror-binary-security "$SECURITY_FINAL" \
+	${NEO_APT_PROXY:+--apt-http-proxy "$NEO_APT_PROXY"} \
+	--security true \
+	--updates true \
+	--apt-recommends false \
+	--apt-indices false \
+	--linux-flavours amd64 \
+	--firmware-chroot false \
+	--firmware-binary false \
+	--debian-installer none \
+	--bootloaders "syslinux,grub-efi" \
+	--binary-image iso-hybrid \
+	--memtest memtest86+ \
+	--chroot-squashfs-compression-type zstd \
+	--chroot-squashfs-compression-level 19 \
+	--iso-application "Néo OS" \
+	--iso-publisher "Néo OS" \
+	--iso-volume "NEO_OS_1_0" \
+	--image-name "neo-os-1.0" \
+	--bootappend-live "$APPEND_COMMUN quiet" \
+	--bootappend-live-failsafe "$APPEND_COMMUN nomodeset noapic noapm nodma nomce nosplash" \
+	--cache-packages true \
+	"${@}"

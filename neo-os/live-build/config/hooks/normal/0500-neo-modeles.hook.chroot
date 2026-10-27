@@ -1,0 +1,30 @@
+#!/bin/sh
+# Néo OS — modèles « Nouveau document » du clic droit dans l'explorateur
+# (comme « Nouveau > Document texte » sous Windows). Dossier ~/Modèles.
+set -e
+D="/etc/skel/Modèles"
+mkdir -p "$D"
+: > "$D/Nouveau document texte.txt"
+python3 - "$D" <<'EOP'
+import sys, zipfile
+d = sys.argv[1]
+MANIFEST = """<?xml version="1.0" encoding="UTF-8"?>
+<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.3">
+ <manifest:file-entry manifest:full-path="/" manifest:media-type="%s"/>
+ <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
+</manifest:manifest>"""
+NS = ('xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+      'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" '
+      'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" office:version="1.3"')
+docs = {
+    "Nouveau document Writer.odt": ("application/vnd.oasis.opendocument.text",
+        '<office:text><text:p/></office:text>'),
+    "Nouveau classeur Calc.ods": ("application/vnd.oasis.opendocument.spreadsheet",
+        '<office:spreadsheet><table:table table:name="Feuille1"><table:table-row><table:table-cell/></table:table-row></table:table></office:spreadsheet>'),
+}
+for nom, (mime, corps) in docs.items():
+    with zipfile.ZipFile("%s/%s" % (d, nom), "w") as z:
+        z.writestr(zipfile.ZipInfo("mimetype"), mime)  # premier, non compressé
+        z.writestr("META-INF/manifest.xml", MANIFEST % mime, zipfile.ZIP_DEFLATED)
+        z.writestr("content.xml", '<?xml version="1.0" encoding="UTF-8"?>\n<office:document-content %s><office:body>%s</office:body></office:document-content>' % (NS, corps), zipfile.ZIP_DEFLATED)
+EOP

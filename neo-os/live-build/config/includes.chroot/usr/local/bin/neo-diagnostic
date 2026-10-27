@@ -1,0 +1,509 @@
+#!/usr/bin/python3
+"""Diagnostic Néo — détecte les problèmes réellement mesurables (affichage,
+réseau, stockage, mémoire, mises à jour, applications), les explique avec un
+code NEO-xxx-nnn et une solution, et exporte un rapport texte.
+
+  neo-diagnostic                 interface graphique
+  neo-diagnostic --texte         rapport dans le terminal
+  neo-diagnostic --exporter F    écrit le rapport dans le fichier F
+
+Il ne prétend pas prévoir toutes les pannes : seules les situations listées
+dans le catalogue (Aide → Codes d'erreur) sont recherchées. Une vérification
+impossible (droits, outil absent) est signalée « Indisponible ».
+"""
+import argparse
+import datetime
+import glob
+import os
+import re
+import socket
+import subprocess
+import sys
+import threading
+import time
+
+sys.path.insert(0, os.environ.get("NEO_LIB", "/usr/local/lib/neo"))
+import neo_erreurs as E  # noqa: E402
+
+CATEGORIES = ["Affichage", "Réseau", "Stockage", "Mémoire", "Mises à jour", "Applications"]
+OK, INDISPONIBLE = "ok", "indisponible"
+
+
+def cmd(args, timeout=20):
+    try:
+        r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+        return r.returncode, r.stdout, r.stderr
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return 127, "", str(e)
+
+
+def lire(chemin, defaut=None):
+    try:
+        with open(chemin, errors="replace") as f:
+            return f.read()
+    except OSError:
+        return defaut
+
+
+_ACCES_JOURNAL = None
+
+
+def journal(args):
+    """Lignes du journal système, ou None si la lecture n'est pas autorisée."""
+    global _ACCES_JOURNAL
+    base = ["journalctl", "--no-pager", "-q", "-o", "short"]
+    if _ACCES_JOURNAL is None:
+        import grp
+        groupes = set()
+        for g in ("adm", "systemd-journal", "wheel"):
+            try:
+                groupes.add(grp.getgrnam(g).gr_gid)
+            except KeyError:
+                pass
+        if os.geteuid() == 0 or groupes & set(os.getgroups()):
+            _ACCES_JOURNAL = []
+        elif cmd(["sudo", "-n", "true"], 5)[0] == 0:
+            _ACCES_JOURNAL = ["sudo", "-n"]
+        else:
+            _ACCES_JOURNAL = False
+    if _ACCES_JOURNAL is False:
+        return None
+    rc, out, _ = cmd(_ACCES_JOURNAL + base + args, 30)
+    return out.splitlines() if rc in (0, 1) else None
+
+
+class Resultat:
+    def __init__(self, categorie, gravite, titre, details="", code=None):
+        self.categorie, self.gravite, self.titre, self.details, self.code = categorie, gravite, titre, details, code
+
+    @classmethod
+    def depuis_code(cls, categorie, code, details=""):
+        g, titre, _, _ = E.fiche(code)
+        return cls(categorie, g, titre, details, code)
+
+
+JOURNAL_INDISPONIBLE = ("Lecture du journal système non autorisée pour ce compte "
+                        "(lancez « sudo neo-diagnostic --texte » ou ajoutez-vous au groupe « adm »).")
+
+
+# --- Affichage -------------------------------------------------------------
+
+def verifier_affichage():
+    R = []
+    c = "Affichage"
+    ligne = lire("/proc/cmdline", "")
+    pilotes = sorted({os.path.basename(os.path.realpath(p)) for p in glob.glob("/sys/class/drm/card*/device/driver")})
+    _, lspci, _ = cmd(["lspci", "-nn"])
+    cartes = [l.split(": ", 1)[-1] for l in lspci.splitlines() if re.search(r"VGA|3D controller|Display", l)]
+    nvidia = any("[10de:" in l for l in lspci.splitlines() if re.search(r"VGA|3D", l))
+    R.append(Resultat(c, OK, "Carte graphique : %s" % ("; ".join(cartes) or "Indisponible"),
+                      "Pilote noyau : %s" % (", ".join(pilotes) or "aucun (affichage VESA/framebuffer)")))
+    if re.search(r"\bnomodeset\b", ligne):
+        R.append(Resultat.depuis_code(c, "NEO-AFF-001", "Option de démarrage : nomodeset"))
+        R.append(Resultat.depuis_code(c, "NEO-AFF-004"))
+    elif nvidia and not os.path.isdir("/sys/module/nouveau"):
+        R.append(Resultat.depuis_code(c, "NEO-AFF-002", "Ligne de démarrage : " + ligne.strip()))
+    if "nouveau.noaccel=1" in ligne:
+        R.append(Resultat(c, E.INFORMATION, "Mode « sans accélération » actif",
+                          "Option nouveau.noaccel=1 : affichage seul, sans accélération 2D/3D.", "NEO-AFF-004"))
+    if os.path.exists("/etc/neo/gl-logiciel"):
+        R.append(Resultat.depuis_code(c, "NEO-AFF-006"))
+    # Journal Xorg (session actuelle) : erreurs (EE) hors messages connus et bénins
+    benins = ("open /dev/dri/card0", "open /dev/fb0", "Failed to load module", "Screen(s) found, but none have",
+              "Cannot open", "error, (NI) not implemented")
+    for chemin in (os.path.expanduser("~/.local/share/xorg/Xorg.0.log"), "/var/log/Xorg.0.log"):
+        contenu = lire(chemin)
+        if contenu is not None:
+            erreurs = [l.strip() for l in contenu.splitlines() if "(EE)" in l and not any(b in l for b in benins)]
+            if erreurs:
+                R.append(Resultat.depuis_code(c, "NEO-AFF-003", "\n".join(erreurs[-8:])))
+            break
+    k = journal(["-k", "-b", "--grep", "nouveau"])
+    if k is None:
+        R.append(Resultat(c, INDISPONIBLE, "Erreurs du pilote graphique : Indisponible", JOURNAL_INDISPONIBLE))
+    else:
+        fautes = [l for l in k if re.search(r"fault|error|timeout|hang|PGRAPH|FIFO|failed", l, re.I)]
+        if fautes:
+            R.append(Resultat.depuis_code(c, "NEO-AFF-005", "\n".join(fautes[-8:])))
+    return R
+
+
+# --- Réseau ----------------------------------------------------------------
+
+def avec_delai(fonction, delai):
+    res = {}
+
+    def f():
+        try:
+            res["ok"] = fonction()
+        except Exception as e:  # noqa: BLE001 - toute erreur réseau compte
+            res["err"] = str(e)
+    t = threading.Thread(target=f, daemon=True)
+    t.start()
+    t.join(delai)
+    return res.get("ok"), res.get("err", "délai dépassé (%d s)" % delai if "ok" not in res else None)
+
+
+def verifier_reseau():
+    R = []
+    c = "Réseau"
+    rc, out, _ = cmd(["systemctl", "is-active", "NetworkManager"])
+    if out.strip() != "active":
+        R.append(Resultat.depuis_code(c, "NEO-RES-005", out.strip()))
+        return R
+    rc, out, _ = cmd(["nmcli", "-t", "-f", "DEVICE,TYPE,STATE", "device"])
+    connectes = [l for l in out.splitlines() if l.endswith(":connected") and ":loopback:" not in l]
+    if not connectes:
+        R.append(Resultat.depuis_code(c, "NEO-RES-001", out.strip()))
+        return R
+    _, ips, _ = cmd(["ip", "-4", "-o", "addr", "show", "scope", "global"])
+    if not ips.strip():
+        R.append(Resultat.depuis_code(c, "NEO-RES-002", "\n".join(connectes)))
+        return R
+    R.append(Resultat(c, OK, "Connexion active", "\n".join(connectes) + "\n" +
+                      "\n".join(l.split()[1] + " " + l.split()[3] for l in ips.splitlines())))
+    _, err = avec_delai(lambda: socket.getaddrinfo("deb.debian.org", 443), 6)
+    if err:
+        R.append(Resultat.depuis_code(c, "NEO-RES-003", err))
+        return R
+    _, err = avec_delai(lambda: socket.create_connection(("deb.debian.org", 443), 6).close(), 8)
+    if err:
+        R.append(Resultat.depuis_code(c, "NEO-RES-004", err))
+    else:
+        R.append(Resultat(c, OK, "Internet accessible (deb.debian.org répond)"))
+    return R
+
+
+# --- Stockage --------------------------------------------------------------
+
+def verifier_stockage():
+    R = []
+    c = "Stockage"
+    st = os.statvfs("/")
+    total, libre = st.f_blocks * st.f_frsize, st.f_bavail * st.f_frsize
+    occupe = 100 * (1 - libre / total) if total else 0
+    detail = "%.1f Go libres sur %.1f Go (%.0f %% utilisés)" % (libre / 1e9, total / 1e9, occupe)
+    if occupe > 97:
+        R.append(Resultat.depuis_code(c, "NEO-STO-002", detail))
+    elif occupe > 90:
+        R.append(Resultat.depuis_code(c, "NEO-STO-001", detail))
+    else:
+        R.append(Resultat(c, OK, "Espace disque suffisant", detail))
+    _, opts, _ = cmd(["findmnt", "-no", "OPTIONS", "/"])
+    if opts.startswith("ro") and not os.path.isdir("/run/live/medium"):
+        R.append(Resultat.depuis_code(c, "NEO-STO-003", opts.strip()))
+    k = journal(["-k", "-b"])
+    if k is None:
+        R.append(Resultat(c, INDISPONIBLE, "Erreurs du disque (journal) : Indisponible", JOURNAL_INDISPONIBLE))
+    else:
+        es = [l for l in k if re.search(r"I/O error|Buffer I/O|blk_update_request|failed command: (READ|WRITE)", l)]
+        es = [l for l in es if not re.search(r"\bsr\d|loop\d", l)]
+        if es:
+            R.append(Resultat.depuis_code(c, "NEO-STO-004", "\n".join(es[-8:])))
+        fs = [l for l in k if "EXT4-fs error" in l]
+        if fs:
+            R.append(Resultat.depuis_code(c, "NEO-STO-006", "\n".join(fs[-5:])))
+        s = journal(["-u", "smartmontools", "-u", "smartd", "--since", "-7d"])
+        if s:
+            alertes = [l for l in s if re.search(r"FAILED|Prefailure|Currently unreadable|Offline uncorrectable|failing", l)]
+            if alertes:
+                R.append(Resultat.depuis_code(c, "NEO-STO-005", "\n".join(alertes[-6:])))
+    return R
+
+
+# --- Mémoire ---------------------------------------------------------------
+
+def meminfo():
+    m = {}
+    for l in (lire("/proc/meminfo", "") or "").splitlines():
+        k, v = l.split(":", 1)
+        m[k] = int(v.split()[0])
+    return m
+
+
+def verifier_memoire():
+    R = []
+    c = "Mémoire"
+    m = meminfo()
+    dispo = m.get("MemAvailable", 0) / max(m.get("MemTotal", 1), 1) * 100
+    detail = ("Utilisée : %d Mo · Disponible : %d Mo · En cache (récupérable) : %d Mo · Total : %d Mo"
+              % ((m["MemTotal"] - m["MemAvailable"]) / 1024, m["MemAvailable"] / 1024,
+                 (m.get("Cached", 0) + m.get("Buffers", 0)) / 1024, m["MemTotal"] / 1024))
+    R.append(Resultat.depuis_code(c, "NEO-MEM-001", detail) if dispo < 10 else Resultat(c, OK, "Mémoire disponible suffisante", detail))
+    swaps = lire("/proc/swaps", "")
+    if "zram" not in swaps:
+        R.append(Resultat.depuis_code(c, "NEO-MEM-004", swaps.strip()))
+    st, sl = m.get("SwapTotal", 0), m.get("SwapFree", 0)
+    if st and (st - sl) / st > 0.8:
+        R.append(Resultat.depuis_code(c, "NEO-MEM-005", "%d Mo utilisés sur %d Mo" % ((st - sl) / 1024, st / 1024)))
+    j = journal(["-u", "earlyoom", "--since", "-7d"])
+    if j is None:
+        R.append(Resultat(c, INDISPONIBLE, "Fermetures par earlyoom : Indisponible", JOURNAL_INDISPONIBLE))
+    else:
+        tues = [l for l in j if re.search(r"sending SIG(TERM|KILL)", l)]
+        if tues:
+            R.append(Resultat.depuis_code(c, "NEO-MEM-002", "\n".join(tues[-8:])))
+        k = journal(["-k", "-b", "--grep", "Out of memory"]) or []
+        if k:
+            R.append(Resultat.depuis_code(c, "NEO-MEM-003", "\n".join(k[-5:])))
+    return R
+
+
+# --- Mises à jour ------------------------------------------------------------
+
+def verifier_maj():
+    R = []
+    c = "Mises à jour"
+    if os.path.isdir("/run/live/medium"):
+        R.append(Resultat(c, E.INFORMATION, "Session d'essai : les mises à jour concernent le système installé"))
+        return R
+    stamp = "/var/lib/apt/periodic/update-success-stamp"
+    ref = stamp if os.path.exists(stamp) else "/var/lib/apt/lists"
+    age = (time.time() - os.path.getmtime(ref)) / 86400 if os.path.exists(ref) else 999
+    if age > 7:
+        R.append(Resultat.depuis_code(c, "NEO-MAJ-001", "Dernière actualisation réussie il y a %d jours" % age))
+    else:
+        _, out, _ = cmd(["apt-get", "-s", "-o", "Debug::NoLocking=1", "dist-upgrade"], 60)
+        n = len([l for l in out.splitlines() if l.startswith("Inst ")])
+        if n:
+            R.append(Resultat.depuis_code(c, "NEO-MAJ-002", "%d paquet(s) à mettre à jour" % n))
+        else:
+            R.append(Resultat(c, OK, "Système à jour", "Listes actualisées il y a %.1f jour(s)" % age))
+    if os.path.exists("/run/reboot-required") or os.path.exists("/var/run/reboot-required"):
+        R.append(Resultat.depuis_code(c, "NEO-MAJ-003", lire("/run/reboot-required.pkgs", "") or ""))
+    if os.listdir("/var/lib/dpkg/updates") if os.path.isdir("/var/lib/dpkg/updates") else []:
+        R.append(Resultat.depuis_code(c, "NEO-MAJ-004", "Fichiers en attente dans /var/lib/dpkg/updates"))
+    else:
+        _, audit, _ = cmd(["dpkg", "--audit"])
+        if audit.strip():
+            R.append(Resultat.depuis_code(c, "NEO-MAJ-004", audit.strip()[:1500]))
+    log = lire("/var/log/unattended-upgrades/unattended-upgrades.log")
+    if log is None:
+        if os.path.exists("/var/log/unattended-upgrades/unattended-upgrades.log"):
+            R.append(Resultat(c, INDISPONIBLE, "Journal des mises à jour automatiques : Indisponible", JOURNAL_INDISPONIBLE))
+    else:
+        dernier = log.split("Starting unattended upgrades script")[-1]
+        erreurs = [l for l in dernier.splitlines() if " ERROR " in l]
+        if erreurs:
+            R.append(Resultat.depuis_code(c, "NEO-MAJ-005", "\n".join(erreurs[-5:])))
+    return R
+
+
+# --- Applications ------------------------------------------------------------
+
+def verifier_applications():
+    R = []
+    c = "Applications"
+    _, out, _ = cmd(["systemctl", "--failed", "--no-legend", "--plain"])
+    if out.strip():
+        R.append(Resultat.depuis_code(c, "NEO-APP-001", out.strip()))
+    else:
+        R.append(Resultat(c, OK, "Tous les services système fonctionnent"))
+    rc, out, _ = cmd(["systemctl", "--user", "--failed", "--no-legend", "--plain"])
+    if rc == 0 and out.strip():
+        R.append(Resultat.depuis_code(c, "NEO-APP-002", out.strip()))
+    k = journal(["-k", "-b", "--grep", "segfault at"])
+    if k is None:
+        R.append(Resultat(c, INDISPONIBLE, "Plantages d'applications : Indisponible", JOURNAL_INDISPONIBLE))
+    elif k:
+        noms = sorted({re.sub(r"\[\d+\]", "", l.split("]: ", 1)[-1].split(":")[0]) for l in k})
+        R.append(Resultat.depuis_code(c, "NEO-APP-003", "Programmes concernés : %s\n%s" % (", ".join(noms), "\n".join(k[-5:]))))
+    return R
+
+
+VERIFICATIONS = [verifier_affichage, verifier_reseau, verifier_stockage, verifier_memoire,
+                 verifier_maj, verifier_applications]
+
+
+def analyser():
+    resultats = []
+    for v in VERIFICATIONS:
+        try:
+            resultats += v()
+        except Exception as e:  # noqa: BLE001 - un contrôle cassé ne doit pas tout arrêter
+            resultats.append(Resultat(v.__name__.replace("verifier_", "").capitalize(), INDISPONIBLE,
+                                      "Vérification impossible", str(e)))
+    return resultats
+
+
+ORDRE = {E.ERREUR: 0, E.AVERTISSEMENT: 1, INDISPONIBLE: 2, E.INFORMATION: 3, OK: 4}
+LIBELLE = dict(E.LIBELLES, indisponible="Indisponible")
+
+
+def rapport(resultats):
+    m = meminfo()
+    _, uname, _ = cmd(["uname", "-r"])
+    _, df, _ = cmd(["df", "-h", "-x", "tmpfs", "-x", "devtmpfs", "-x", "squashfs", "-x", "overlay"])
+    cpu = next((l.split(":", 1)[1].strip() for l in (lire("/proc/cpuinfo", "") or "").splitlines()
+                if l.startswith("model name")), "Indisponible")
+    l = ["Rapport du Diagnostic Néo — %s" % datetime.datetime.now().strftime("%d/%m/%Y %H:%M"),
+         "=" * 60,
+         "Système : %s" % (lire("/etc/neo-release", "Néo OS") or "").strip(),
+         "Noyau : %s" % uname.strip(),
+         "Processeur : %s" % cpu,
+         "Mémoire : %d Mo" % (m.get("MemTotal", 0) / 1024),
+         "Démarrage : %s" % (lire("/proc/cmdline", "") or "").strip(),
+         "Session d'essai : %s" % ("oui" if os.path.isdir("/run/live/medium") else "non"), ""]
+    nb = {g: sum(1 for r in resultats if r.gravite == g) for g in ORDRE}
+    l.append("Résumé : %d erreur(s), %d avertissement(s), %d vérification(s) indisponible(s)"
+             % (nb[E.ERREUR], nb[E.AVERTISSEMENT], nb[INDISPONIBLE]))
+    for cat in CATEGORIES:
+        l += ["", "--- %s ---" % cat]
+        for r in sorted((r for r in resultats if r.categorie == cat), key=lambda r: ORDRE.get(r.gravite, 9)):
+            l.append("[%s]%s %s" % (LIBELLE.get(r.gravite, r.gravite), " " + r.code if r.code else "", r.titre))
+            if r.code:
+                _, _, expl, sol = E.fiche(r.code)
+                l += ["    " + expl, "    Que faire : " + sol]
+            if r.details:
+                l += ["    | " + x for x in r.details.splitlines()]
+    l += ["", "--- Disques ---", df.strip(), "", "Fin du rapport."]
+    return "\n".join(l)
+
+
+def interface():
+    import gi
+    gi.require_version("Gtk", "3.0")
+    from gi.repository import GLib, Gtk
+
+    class Fenetre(Gtk.Window):
+        def __init__(self):
+            super().__init__(title="Diagnostic Néo")
+            self.set_default_size(820, 600)
+            self.set_icon_name("neo-diagnostic")
+            self.resultats = []
+            boite = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            self.add(boite)
+            haut = Gtk.Box(spacing=8)
+            for cote in ("top", "bottom", "start", "end"):
+                getattr(haut, "set_margin_" + cote)(10)
+            self.resume = Gtk.Label(xalign=0)
+            haut.pack_start(self.resume, True, True, 0)
+            self.bouton_analyser = Gtk.Button(label="Analyser à nouveau")
+            self.bouton_analyser.connect("clicked", lambda _b: self.lancer())
+            exporter = Gtk.Button(label="Exporter le rapport…")
+            exporter.get_style_context().add_class("suggested-action")
+            exporter.connect("clicked", self.exporter)
+            haut.pack_end(exporter, False, False, 0)
+            haut.pack_end(self.bouton_analyser, False, False, 0)
+            boite.pack_start(haut, False, False, 0)
+            corps = Gtk.Paned()
+            boite.pack_start(corps, True, True, 0)
+            self.liste_cat = Gtk.ListBox()
+            self.liste_cat.get_style_context().add_class("sidebar")
+            for cat in ["Tout"] + CATEGORIES:
+                ligne = Gtk.ListBoxRow()
+                lab = Gtk.Label(label=cat, xalign=0)
+                lab.set_margin_start(12)
+                lab.set_margin_top(8)
+                lab.set_margin_bottom(8)
+                ligne.add(lab)
+                ligne.categorie = cat
+                self.liste_cat.add(ligne)
+            self.liste_cat.connect("row-selected", lambda *_: self.afficher())
+            corps.pack1(self.liste_cat, False, False)
+            defil = Gtk.ScrolledWindow()
+            self.zone = Gtk.ListBox()
+            self.zone.set_selection_mode(Gtk.SelectionMode.NONE)
+            defil.add(self.zone)
+            corps.pack2(defil, True, False)
+            corps.set_position(170)
+            self.liste_cat.select_row(self.liste_cat.get_row_at_index(0))
+            self.lancer()
+
+        def lancer(self):
+            self.bouton_analyser.set_sensitive(False)
+            self.resume.set_markup("<b>Analyse en cours…</b> (réseau et journaux : quelques secondes)")
+
+            def travail():
+                res = analyser()
+                GLib.idle_add(self.fin, res)
+            threading.Thread(target=travail, daemon=True).start()
+
+        def fin(self, res):
+            self.resultats = res
+            nb = {g: sum(1 for r in res if r.gravite == g) for g in ORDRE}
+            self.resume.set_markup("<b>%d erreur(s) · %d avertissement(s)</b> · %d indisponible(s) · %d contrôle(s) OK"
+                                   % (nb[E.ERREUR], nb[E.AVERTISSEMENT], nb[INDISPONIBLE], nb[OK]))
+            self.bouton_analyser.set_sensitive(True)
+            self.afficher()
+
+        def afficher(self):
+            for e in self.zone.get_children():
+                self.zone.remove(e)
+            ligne = self.liste_cat.get_selected_row()
+            cat = ligne.categorie if ligne else "Tout"
+            res = [r for r in self.resultats if cat == "Tout" or r.categorie == cat]
+            for r in sorted(res, key=lambda r: (ORDRE.get(r.gravite, 9), r.categorie)):
+                carte = Gtk.Box(spacing=12)
+                for cote in ("top", "bottom", "start", "end"):
+                    getattr(carte, "set_margin_" + cote)(10)
+                icone = Gtk.Image.new_from_icon_name(E.ICONES.get(r.gravite, "dialog-information"), Gtk.IconSize.DIALOG)
+                icone.set_valign(Gtk.Align.START)
+                carte.pack_start(icone, False, False, 0)
+                v = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+                titre = Gtk.Label(xalign=0)
+                titre.set_line_wrap(True)
+                titre.set_markup("<b>%s%s — %s</b>  <small>(%s)</small>" % (
+                    LIBELLE.get(r.gravite, r.gravite), " · " + r.code if r.code else "",
+                    GLib.markup_escape_text(r.titre), r.categorie))
+                if r.gravite == E.ERREUR:
+                    titre.get_style_context().add_class("error")
+                elif r.gravite == E.AVERTISSEMENT:
+                    titre.get_style_context().add_class("warning")
+                v.pack_start(titre, False, False, 0)
+                if r.code:
+                    _, _, expl, sol = E.fiche(r.code)
+                    t = Gtk.Label(xalign=0)
+                    t.set_line_wrap(True)
+                    t.set_markup("%s\n<b>Que faire :</b> %s" % (GLib.markup_escape_text(expl), GLib.markup_escape_text(sol)))
+                    v.pack_start(t, False, False, 0)
+                if r.details:
+                    exp = Gtk.Expander(label="Détails")
+                    d = Gtk.Label(label=r.details[-2500:], xalign=0, selectable=True)
+                    d.set_line_wrap(True)
+                    exp.add(d)
+                    exp.set_expanded(r.gravite == OK)
+                    v.pack_start(exp, False, False, 0)
+                carte.pack_start(v, True, True, 0)
+                self.zone.add(carte)
+            self.zone.show_all()
+
+        def exporter(self, _b):
+            dlg = Gtk.FileChooserDialog(title="Exporter le rapport", parent=self, action=Gtk.FileChooserAction.SAVE)
+            dlg.add_buttons("Annuler", Gtk.ResponseType.CANCEL, "Enregistrer", Gtk.ResponseType.OK)
+            dlg.set_do_overwrite_confirmation(True)
+            dossier = subprocess.run(["xdg-user-dir", "DOCUMENTS"], capture_output=True, text=True).stdout.strip()
+            dlg.set_current_folder(dossier or os.path.expanduser("~"))
+            dlg.set_current_name("rapport-diagnostic-neo-%s.txt" % datetime.datetime.now().strftime("%Y%m%d-%H%M"))
+            if dlg.run() == Gtk.ResponseType.OK:
+                chemin = dlg.get_filename()
+                with open(chemin, "w", encoding="utf-8") as f:
+                    f.write(rapport(self.resultats))
+                m = Gtk.MessageDialog(transient_for=self, message_type=Gtk.MessageType.INFO,
+                                      buttons=Gtk.ButtonsType.CLOSE, text="Rapport enregistré")
+                m.format_secondary_text(chemin)
+                m.run()
+                m.destroy()
+            dlg.destroy()
+
+    f = Fenetre()
+    f.connect("destroy", Gtk.main_quit)
+    f.show_all()
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    p = argparse.ArgumentParser(description="Diagnostic Néo")
+    p.add_argument("--texte", action="store_true", help="rapport dans le terminal")
+    p.add_argument("--exporter", metavar="FICHIER", help="écrire le rapport dans un fichier")
+    a = p.parse_args()
+    if a.texte or a.exporter or not os.environ.get("DISPLAY"):
+        texte = rapport(analyser())
+        if a.exporter:
+            with open(a.exporter, "w", encoding="utf-8") as f:
+                f.write(texte)
+            print("Rapport écrit :", a.exporter)
+        else:
+            print(texte)
+    else:
+        interface()

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Logo Néo OS : un « N » crème sur bleu marine, point vert menthe -->
+  <g transform="">
+    <rect x="8" y="8" width="240" height="240" rx="60" fill="#0F2B5B"/>
+    <path d="M78 184 V74 L178 184 V74" fill="none" stroke="#FEF9EB" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="196" cy="58" r="20" fill="#7DCDAD"/>
+  </g>
+</svg>

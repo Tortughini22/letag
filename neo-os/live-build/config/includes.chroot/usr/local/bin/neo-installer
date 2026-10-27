@@ -1,0 +1,117 @@
+#!/usr/bin/python3
+"""Installer Néo OS — étape de sécurité avant l'installateur Calamares.
+
+Affiche les disques et partitions présents, rappelle ce que chaque mode
+d'installation fait des données, et n'ouvre Calamares qu'après confirmation
+explicite d'une sauvegarde. Rien n'est jamais effacé automatiquement :
+Calamares démarre sans aucune option de partitionnement présélectionnée.
+"""
+import json
+import os
+import subprocess
+
+import gi
+
+gi.require_version("Gtk", "3.0")
+from gi.repository import GLib, Gtk  # noqa: E402
+
+TEXTE = (
+    "<b>L'installation ne supprime rien sans votre accord.</b>\n\n"
+    "À l'étape « Partitions », choisissez :\n"
+    "  • <b>Installer à côté</b> : réduit une partition existante et conserve ses fichiers "
+    "(sauvegardez quand même : un redimensionnement interrompu peut les abîmer) ;\n"
+    "  • <b>Remplacer une partition</b> : seule la partition choisie est effacée ;\n"
+    "  • <b>Partitionnement manuel</b> : contrôle total, rien n'est modifié sans vous ;\n"
+    "  • <b>Effacer le disque</b> : <span foreground='#B3261E'><b>supprime tout le contenu du "
+    "disque choisi</b></span>. À n'utiliser que sur un disque vide ou sauvegardé.\n\n"
+    "Le résumé final liste toutes les modifications avant qu'elles soient appliquées : "
+    "relisez-le attentivement."
+)
+
+
+def disques():
+    """Liste (nom, taille, système de fichiers, étiquette, utilisé) des disques."""
+    try:
+        brut = subprocess.run(["lsblk", "-J", "-o", "NAME,TYPE,SIZE,FSTYPE,LABEL,FSUSED,MODEL,RM"],
+                              capture_output=True, text=True, check=True).stdout
+        return json.loads(brut).get("blockdevices", [])
+    except (OSError, subprocess.CalledProcessError, ValueError):
+        return []
+
+
+class Installateur(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Installer Néo OS")
+        self.set_default_size(640, 520)
+        self.set_icon_name("neo-installer")
+        self.set_position(Gtk.WindowPosition.CENTER)
+        boite = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        for cote in ("top", "bottom", "start", "end"):
+            getattr(boite, "set_margin_" + cote)(22)
+        self.add(boite)
+
+        titre = Gtk.Label(xalign=0)
+        titre.set_markup("<span size='x-large' weight='bold'>Avant d'installer Néo OS</span>")
+        boite.pack_start(titre, False, False, 0)
+        info = Gtk.Label(xalign=0)
+        info.set_line_wrap(True)
+        info.set_markup(TEXTE)
+        boite.pack_start(info, False, False, 0)
+
+        sous = Gtk.Label(xalign=0)
+        sous.set_markup("<b>Disques détectés sur cet ordinateur</b>")
+        boite.pack_start(sous, False, False, 0)
+        modele = Gtk.TreeStore(str, str, str, str, str)
+        for d in disques():
+            if d.get("type") != "disk" or d["name"].startswith(("loop", "zram", "sr")):
+                continue
+            nom = "/dev/%s%s" % (d["name"], " (amovible)" if d.get("rm") else "")
+            parent = modele.append(None, [nom, d.get("size") or "", "", d.get("model") or "", ""])
+            for p in d.get("children") or []:
+                modele.append(parent, ["/dev/" + p["name"], p.get("size") or "", p.get("fstype") or "",
+                                       p.get("label") or "", p.get("fsused") or ""])
+        vue = Gtk.TreeView(model=modele)
+        for i, t in enumerate(("Périphérique", "Taille", "Système de fichiers", "Étiquette / modèle", "Occupé")):
+            vue.append_column(Gtk.TreeViewColumn(t, Gtk.CellRendererText(), text=i))
+        vue.expand_all()
+        defil = Gtk.ScrolledWindow()
+        defil.set_min_content_height(90)
+        defil.add(vue)
+        boite.pack_start(defil, True, True, 0)
+
+        self.case = Gtk.CheckButton(label="J'ai sauvegardé les données importantes de ces disques "
+                                          "(ou ils ne contiennent rien d'important).")
+        self.case.get_child().set_line_wrap(True)
+        self.case.connect("toggled", lambda c: self.lancer.set_sensitive(c.get_active()))
+        boite.pack_start(self.case, False, False, 0)
+
+        boutons = Gtk.Box(spacing=8)
+        annuler = Gtk.Button(label="Annuler")
+        annuler.connect("clicked", lambda _b: self.destroy())
+        self.lancer = Gtk.Button(label="Ouvrir l'installateur")
+        self.lancer.get_style_context().add_class("suggested-action")
+        self.lancer.set_sensitive(False)
+        self.lancer.connect("clicked", self.ouvrir)
+        boutons.pack_end(self.lancer, False, False, 0)
+        boutons.pack_end(annuler, False, False, 0)
+        boite.pack_start(boutons, False, False, 0)
+
+    def ouvrir(self, _b):
+        self.hide()
+        while Gtk.events_pending():
+            Gtk.main_iteration()
+        # Enveloppe Debian : écarte le fstab de la session live puis lance
+        # Calamares en administrateur via pkexec.
+        subprocess.run(["calamares-install-debian"])
+        self.destroy()
+
+
+if __name__ == "__main__":
+    if not os.path.isdir("/run/live/medium"):
+        print("neo-installer ne fonctionne que depuis la clé USB / le DVD Néo OS.")
+        raise SystemExit(1)
+    fen = Installateur()
+    fen.connect("destroy", Gtk.main_quit)
+    fen.show_all()
+    GLib.idle_add(fen.case.grab_focus)
+    Gtk.main()

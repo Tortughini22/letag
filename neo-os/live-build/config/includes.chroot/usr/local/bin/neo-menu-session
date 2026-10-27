@@ -1,0 +1,68 @@
+#!/usr/bin/python3
+"""Menu de session Néo (Ctrl + Alt + Suppr), comme l'écran de Windows :
+Verrouiller, Changer d'utilisateur, Se déconnecter, Gestionnaire des tâches,
+Redémarrer, Éteindre. Échap ou « Annuler » ferme le menu sans rien faire."""
+import os
+import subprocess
+
+import gi
+
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
+from gi.repository import Gdk, Gtk  # noqa: E402
+
+LIVE = os.path.isdir("/run/live/medium")
+ACTIONS = [
+    ("Verrouiller", "system-lock-screen", ["xflock4"], not LIVE),
+    ("Changer d'utilisateur", "system-users", ["dm-tool", "switch-to-greeter"], not LIVE),
+    ("Se déconnecter", "system-log-out", ["xfce4-session-logout", "--logout"], True),
+    ("Gestionnaire des tâches", "neo-taches", ["neo-taches"], True),
+    ("Redémarrer", "system-reboot", ["xfce4-session-logout", "--reboot"], True),
+    ("Éteindre", "system-shutdown", ["xfce4-session-logout", "--halt"], True),
+]
+
+
+class Menu(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Menu de session")
+        self.set_position(Gtk.WindowPosition.CENTER)
+        self.set_keep_above(True)
+        self.set_resizable(False)
+        self.set_type_hint(Gdk.WindowTypeHint.DIALOG)
+        b = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        for cote in ("top", "bottom", "start", "end"):
+            getattr(b, "set_margin_" + cote)(22)
+        t = Gtk.Label()
+        t.set_markup("<span size='large' weight='bold'>Que voulez-vous faire ?</span>")
+        b.pack_start(t, False, False, 6)
+        for texte, icone, commande, permis in ACTIONS:
+            if not permis:
+                continue
+            bt = Gtk.Button()
+            ligne = Gtk.Box(spacing=12)
+            ligne.pack_start(Gtk.Image.new_from_icon_name(icone, Gtk.IconSize.LARGE_TOOLBAR), False, False, 0)
+            ligne.pack_start(Gtk.Label(label=texte, xalign=0), True, True, 0)
+            bt.add(ligne)
+            bt.set_size_request(320, 42)
+            bt.connect("clicked", self.lancer, commande)
+            b.pack_start(bt, False, False, 0)
+        annuler = Gtk.Button(label="Annuler")
+        annuler.get_style_context().add_class("suggested-action")
+        annuler.connect("clicked", lambda _b: self.destroy())
+        b.pack_start(annuler, False, False, 10)
+        self.add(b)
+        self.connect("key-press-event", lambda _w, e: e.keyval == Gdk.KEY_Escape and self.destroy())
+        annuler.grab_focus()
+
+    def lancer(self, _b, commande):
+        self.hide()
+        subprocess.Popen(commande)
+        self.destroy()
+
+
+if __name__ == "__main__":
+    m = Menu()
+    m.connect("destroy", Gtk.main_quit)
+    m.show_all()
+    m.present()
+    Gtk.main()

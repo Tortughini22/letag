@@ -1,0 +1,23 @@
+#!/bin/sh
+# Néo OS / Calamares — finitions exécutées DANS le système installé.
+# 1. Retire les éléments propres à la session live.
+rm -f /usr/local/bin/neo-installer /usr/share/applications/neo-installer.desktop
+rm -f /etc/xdg/neo/autostart/calamares-desktop-icon.desktop
+# 2. GRUB (BIOS) : mémorise le disque où il a été installé, pour que les mises
+#    à jour automatiques de grub-pc réinstallent le chargeur au bon endroit.
+if dpkg -s grub-pc >/dev/null 2>&1 && [ ! -d /sys/firmware/efi/efivars ]; then
+	disque=$(grub-probe --target=disk /boot/grub 2>/dev/null)
+	if [ -n "$disque" ]; then
+		stable="$disque"
+		for lien in /dev/disk/by-id/ata-* /dev/disk/by-id/wwn-* /dev/disk/by-id/*; do
+			[ -e "$lien" ] || continue
+			case "$lien" in *-part[0-9]*) continue ;; esac
+			if [ "$(readlink -f "$lien")" = "$disque" ]; then stable="$lien"; break; fi
+		done
+		echo "grub-pc grub-pc/install_devices multiselect $stable" | debconf-set-selections
+		echo "grub-pc : disque d'amorçage mémorisé ($stable)."
+	fi
+fi
+# 3. Nettoyage des dépendances devenues inutiles.
+apt-get -y autoremove --purge >/dev/null 2>&1 || true
+exit 0

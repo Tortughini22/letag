@@ -1,0 +1,55 @@
+#!/usr/bin/python3
+"""Fiche « Raccourcis clavier » de Néo OS (Aide). Lit la liste unique
+/usr/share/neo/raccourcis.tsv, celle que neo-session applique."""
+import gi
+
+gi.require_version("Gtk", "3.0")
+from gi.repository import GLib, Gtk  # noqa: E402
+
+SOURCE = "/usr/share/neo/raccourcis.tsv"
+SECTIONS = {"commande": "Applications et session", "xfwm4": "Fenêtres et bureaux",
+            "natif": "Fichiers et édition (explorateur, applications)"}
+
+
+def lire():
+    res = {k: [] for k in SECTIONS}
+    with open(SOURCE, encoding="utf-8") as f:
+        for l in f:
+            if l.startswith("#") or not l.strip():
+                continue
+            c = l.rstrip("\n").split("\t")
+            if len(c) == 5 and c[0] in res:
+                res[c[0]].append((c[3], c[4]))
+    return res
+
+
+w = Gtk.Window(title="Raccourcis clavier")
+w.set_default_size(640, 680)
+w.set_icon_name("neo-raccourcis")
+defil = Gtk.ScrolledWindow()
+b = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+for cote in ("top", "bottom", "start", "end"):
+    getattr(b, "set_margin_" + cote)(20)
+t = Gtk.Label(xalign=0)
+t.set_markup("<span size='x-large' weight='bold'>Raccourcis clavier</span>\n"
+             "La touche <b>Windows</b> est la touche au logo Windows (aussi appelée Super).")
+b.pack_start(t, False, False, 8)
+for type_, lignes in lire().items():
+    s = Gtk.Label(xalign=0)
+    s.set_markup("<b>%s</b>" % GLib.markup_escape_text(SECTIONS[type_]))
+    s.set_margin_top(12)
+    b.pack_start(s, False, False, 0)
+    g = Gtk.Grid(column_spacing=24, row_spacing=6)
+    for n, (touches, desc) in enumerate(lignes):
+        k = Gtk.Label(xalign=0)
+        k.set_markup("<tt><b>%s</b></tt>" % GLib.markup_escape_text(touches))
+        d = Gtk.Label(label=desc, xalign=0)
+        d.set_line_wrap(True)
+        g.attach(k, 0, n, 1, 1)
+        g.attach(d, 1, n, 1, 1)
+    b.pack_start(g, False, False, 0)
+defil.add(b)
+w.add(defil)
+w.connect("destroy", Gtk.main_quit)
+w.show_all()
+Gtk.main()

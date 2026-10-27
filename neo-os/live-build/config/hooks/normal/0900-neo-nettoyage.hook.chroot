@@ -1,0 +1,7 @@
+#!/bin/sh
+# Néo OS — nettoyage final de l'image (taille et confidentialité).
+set -e
+apt-get -y autoremove --purge || true
+apt-get clean
+rm -rf /tmp/* /var/tmp/*
+rm -f /var/cache/debconf/*-old /var/lib/dpkg/*-old

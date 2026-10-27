@@ -1,0 +1,1090 @@
+#!/usr/bin/python3
+"""Gestionnaire des tâches Néo — présentation proche de celle de Windows.
+
+Onglets :
+  Processus     applications (avec leurs sous-processus), processus en
+                arrière-plan et processus du système ; recherche, tri,
+                fin de tâche (fermeture propre puis arrêt forcé si besoin),
+                protection des processus essentiels.
+  Performances  graphiques du processeur, de la mémoire, des disques, du
+                réseau et de la carte graphique. Une mesure que le système ne
+                fournit pas est affichée « Indisponible » (jamais inventée).
+  Démarrage     programmes lancés à l'ouverture de session (activer/désactiver).
+Bouton « Libérer de la RAM » : propose de fermer les applications que vous
+cochez (rien n'est fermé sans votre accord) et affiche la mémoire récupérée.
+Raccourci : Ctrl + Maj + Échap.
+"""
+import configparser
+import glob
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import time
+
+import gi
+
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
+from gi.repository import Gdk, GLib, Gtk, Pango  # noqa: E402
+import psutil  # noqa: E402
+
+sys.path.insert(0, os.environ.get("NEO_LIB", "/usr/local/lib/neo"))
+import neo_erreurs as E  # noqa: E402
+
+MOI = os.getuid()
+NCPU = psutil.cpu_count() or 1
+HISTO = 60
+INDISPO = "Indisponible"
+
+BLEU, MENTHE, VERT_EAU, MARINE = (0.267, 0.471, 0.686), (0.490, 0.804, 0.678), (0.569, 0.824, 0.737), (0.059, 0.169, 0.357)
+
+# Processus dont l'arrêt fermerait la session ou déstabiliserait le système.
+PROTEGES = {
+    "systemd", "Xorg", "X", "xfwm4", "xfce4-session", "xfce4-panel", "xfdesktop", "xfsettingsd",
+    "xfconfd", "lightdm", "dbus-daemon", "dbus-broker", "pipewire", "pipewire-pulse", "wireplumber",
+    "polkit-mate-aut", "light-locker", "earlyoom", "NetworkManager", "gvfsd", "at-spi-bus-laun",
+    "at-spi2-registr", "xfce4-notifyd", "systemd-logind", "login", "agetty", "wrapper-2.0",
+    "polkit-mate-authentication-agent-1", "at-spi-bus-launcher", "at-spi2-registryd", "neo-taches",
+}
+NOMS = {
+    "firefox-esr": "Firefox", "Web Content": "Firefox — contenu web", "Isolated Web Co": "Firefox — onglet",
+    "WebExtensions": "Firefox — extensions", "Privileged Cont": "Firefox — pages internes",
+    "RDD Process": "Firefox — décodage multimédia", "Socket Process": "Firefox — réseau",
+    "Utility Process": "Firefox — utilitaire", "forkserver": "Firefox — lanceur",
+    "Discord": "Discord", "soffice.bin": "LibreOffice", "Thunar": "Explorateur de fichiers",
+    "thunar": "Explorateur de fichiers", "xfce4-terminal": "Terminal", "celluloid": "Celluloid (vidéo)",
+    "mpv": "mpv (vidéo)", "geany": "Geany", "mousepad": "Mousepad", "ristretto": "Visionneuse d'images",
+    "atril": "Lecteur PDF", "catfish": "Recherche de fichiers", "xfce4-panel": "Barre des tâches",
+    "xfwm4": "Gestionnaire de fenêtres", "xfdesktop": "Bureau", "Xorg": "Serveur d'affichage",
+    "picom": "Animations (picom)", "neo-taches": "Gestionnaire des tâches", "neo-diagnostic": "Diagnostic Néo", "nm-applet": "Icône réseau", "pipewire": "Son (PipeWire)",
+}
+
+
+def taille(octets):
+    return "%.1f Mo" % (octets / 1048576.0)
+
+
+def debit(octets_s):
+    if octets_s >= 1048576:
+        return "%.1f Mo/s" % (octets_s / 1048576.0)
+    return "%.0f Ko/s" % (octets_s / 1024.0)
+
+
+def lire(chemin):
+    try:
+        with open(chemin) as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+
+def fenetres():
+    """{pid: [id fenêtre, …]} via wmctrl (fenêtres gérées par le gestionnaire)."""
+    res = {}
+    try:
+        out = subprocess.run(["wmctrl", "-lp"], capture_output=True, text=True, timeout=3).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return res
+    for l in out.splitlines():
+        p = l.split(None, 4)
+        if len(p) >= 3 and p[2].isdigit() and p[1] != "-1":
+            res.setdefault(int(p[2]), []).append(p[0])
+    return res
+
+
+# --- Mesures système ---------------------------------------------------------
+
+class Mesures:
+    def __init__(self):
+        self.t = time.monotonic()
+        self.disques = self.lire_disques()
+        self.reseau = psutil.net_io_counters(pernic=True)
+        self.histo = {"cpu": [], "ram": [], "disque": {}, "reseau": {}, "gpu": []}
+        psutil.cpu_percent()
+        self.gpu = self.detecter_gpu()
+
+    @staticmethod
+    def lire_disques():
+        res = {}
+        for l in open("/proc/diskstats"):
+            c = l.split()
+            nom = c[2]
+            if os.path.exists("/sys/block/%s/device" % nom) and not nom.startswith(("loop", "sr", "zram")):
+                # secteurs lus (5), écrits (9), temps d'activité ms (12)
+                res[nom] = (int(c[5]) * 512, int(c[9]) * 512, int(c[12]))
+        return res
+
+    @staticmethod
+    def detecter_gpu():
+        g = {"nom": INDISPO, "pilote": INDISPO, "charge": None, "vram": None, "vram_total": None, "raison": ""}
+        try:
+            out = subprocess.run(["lspci", "-mm"], capture_output=True, text=True, timeout=3).stdout
+            for l in out.splitlines():
+                if '"VGA' in l or '"3D' in l or '"Display' in l:
+                    p = l.split('"')
+                    g["nom"] = "%s %s" % (p[3], p[5]) if len(p) > 5 else l
+                    break
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        for carte in sorted(glob.glob("/sys/class/drm/card[0-9]")):
+            dev = carte + "/device"
+            if os.path.exists(dev + "/driver"):
+                g["pilote"] = os.path.basename(os.path.realpath(dev + "/driver"))
+                g["dev"] = dev
+                break
+        else:
+            if os.path.isdir("/sys/module/vesafb") or "nomodeset" in (lire("/proc/cmdline") or ""):
+                g["pilote"] = "VESA (mode secours)"
+        p = g["pilote"]
+        if p == "amdgpu":
+            g["raison"] = ""
+        elif p == "nouveau":
+            g["raison"] = "Le pilote « nouveau » ne publie ni la charge du processeur graphique ni la mémoire vidéo utilisée."
+        elif p == "i915":
+            g["raison"] = "Le pilote Intel ne publie pas ces mesures sans outils supplémentaires."
+        else:
+            g["raison"] = "Ce pilote ne publie pas la charge du processeur graphique ni la mémoire vidéo utilisée."
+        return g
+
+    def lire_gpu(self):
+        d = self.gpu.get("dev")
+        if not d:
+            return
+        busy = lire(d + "/gpu_busy_percent")
+        self.gpu["charge"] = float(busy) if busy and busy.isdigit() else None
+        used, tot = lire(d + "/mem_info_vram_used"), lire(d + "/mem_info_vram_total")
+        if used and tot and used.isdigit() and tot.isdigit():
+            self.gpu["vram"], self.gpu["vram_total"] = int(used), int(tot)
+
+    def echantillon(self):
+        maintenant = time.monotonic()
+        dt = max(maintenant - self.t, 0.001)
+        self.t = maintenant
+        h = self.histo
+        h["cpu"] = (h["cpu"] + [psutil.cpu_percent()])[-HISTO:]
+        m = psutil.virtual_memory()
+        h["ram"] = (h["ram"] + [100.0 * (m.total - m.available) / m.total])[-HISTO:]
+        nouveaux = self.lire_disques()
+        self.vitesses_disques = {}
+        for nom, (lu, ecrit, actif) in nouveaux.items():
+            a = self.disques.get(nom, (lu, ecrit, actif))
+            pct = min(100.0, (actif - a[2]) / (dt * 10.0))
+            self.vitesses_disques[nom] = ((lu - a[0]) / dt, (ecrit - a[1]) / dt, pct)
+            h["disque"][nom] = (h["disque"].get(nom, []) + [pct])[-HISTO:]
+        self.disques = nouveaux
+        reseau = psutil.net_io_counters(pernic=True)
+        self.vitesses_reseau = {}
+        for nom, c in reseau.items():
+            if nom == "lo":
+                continue
+            a = self.reseau.get(nom, c)
+            rx, tx = (c.bytes_recv - a.bytes_recv) / dt, (c.bytes_sent - a.bytes_sent) / dt
+            self.vitesses_reseau[nom] = (rx, tx)
+            h["reseau"][nom] = (h["reseau"].get(nom, []) + [(rx, tx)])[-HISTO:]
+        self.reseau = reseau
+        self.lire_gpu()
+        if self.gpu["charge"] is not None:
+            h["gpu"] = (h["gpu"] + [self.gpu["charge"]])[-HISTO:]
+
+
+def memoire_detaillee():
+    m = {}
+    for l in open("/proc/meminfo"):
+        k, v = l.split(":", 1)
+        m[k] = int(v.split()[0]) * 1024
+    utilisee = m["MemTotal"] - m["MemAvailable"]
+    cache = m.get("Cached", 0) + m.get("Buffers", 0) + m.get("SReclaimable", 0) - m.get("Shmem", 0)
+    zram = None
+    st = lire("/sys/block/zram0/mm_stat")
+    if st:
+        c = st.split()
+        zram = (int(c[0]), int(c[2]))  # données stockées, mémoire réelle occupée
+    return {"total": m["MemTotal"], "utilisee": utilisee, "disponible": m["MemAvailable"],
+            "cache": max(cache, 0), "libre": m["MemFree"], "partagee": m.get("Shmem", 0),
+            "swap_total": m.get("SwapTotal", 0), "swap_utilise": m.get("SwapTotal", 0) - m.get("SwapFree", 0),
+            "zram": zram}
+
+
+# --- Graphiques --------------------------------------------------------------
+
+class Graphe(Gtk.DrawingArea):
+    """Courbe sur 60 points (une par seconde), remplie, dans l'esprit de Windows."""
+
+    def __init__(self, couleur, maxi=100.0, mini=False, double=False):
+        super().__init__()
+        self.couleur, self.maxi, self.mini, self.double = couleur, maxi, mini, double
+        self.valeurs, self.message = [], None
+        self.set_size_request(70 if mini else 360, 34 if mini else 180)
+        self.connect("draw", self.dessiner)
+
+    def maj(self, valeurs, message=None):
+        self.valeurs, self.message = valeurs, message
+        self.queue_draw()
+
+    def dessiner(self, w, cr):
+        a = w.get_allocation()
+        L, H = a.width, a.height
+        fg = w.get_style_context().get_color(Gtk.StateFlags.NORMAL)
+        r, g, b = self.couleur
+        cr.set_source_rgba(r, g, b, 0.08)
+        cr.rectangle(0, 0, L, H)
+        cr.fill()
+        cr.set_source_rgba(fg.red, fg.green, fg.blue, 0.12)
+        cr.set_line_width(1)
+        if not self.mini:
+            for i in range(1, 4):
+                cr.move_to(0, H * i / 4.0)
+                cr.line_to(L, H * i / 4.0)
+            cr.stroke()
+        cr.set_source_rgba(r, g, b, 0.9)
+        cr.rectangle(0.5, 0.5, L - 1, H - 1)
+        cr.stroke()
+        if self.message:
+            cr.set_source_rgba(fg.red, fg.green, fg.blue, 0.7)
+            cr.select_font_face("Inter")
+            cr.set_font_size(11 if self.mini else 14)
+            ext = cr.text_extents(self.message)
+            cr.move_to((L - ext.width) / 2, (H + ext.height) / 2)
+            cr.show_text(self.message)
+            return
+        series = [[v[0] for v in self.valeurs], [v[1] for v in self.valeurs]] if self.double else [self.valeurs]
+        maxi = self.maxi or max([1.0] + [max(s) for s in series if s]) * 1.2
+        for n, s in enumerate(series):
+            if not s:
+                continue
+            pas = L / float(HISTO - 1)
+            x0 = L - pas * (len(s) - 1)
+            cr.move_to(x0, H)
+            for i, v in enumerate(s):
+                cr.line_to(x0 + i * pas, H - min(v, maxi) / maxi * (H - 2))
+            cr.line_to(L, H)
+            cr.close_path()
+            rr, gg, bb = (self.couleur if n == 0 else MENTHE)
+            cr.set_source_rgba(rr, gg, bb, 0.30)
+            cr.fill_preserve()
+            cr.new_path()
+            for i, v in enumerate(s):
+                (cr.move_to if i == 0 else cr.line_to)(x0 + i * pas, H - min(v, maxi) / maxi * (H - 2))
+            cr.set_source_rgba(rr, gg, bb, 1)
+            cr.set_line_width(1.5)
+            cr.stroke()
+
+
+# --- Fenêtre principale ---------------------------------------------------------
+
+class Gestionnaire(Gtk.Window):
+    COLS = (str, str, int, str, float, str, float, str, float, str, str, int)
+    # 0 nom, 1 icône, 2 pid, 3 cpu txt, 4 cpu, 5 mém txt, 6 mém, 7 disque txt, 8 disque, 9 état, 10 clé, 11 poids (police)
+
+    def __init__(self):
+        super().__init__(title="Gestionnaire des tâches")
+        self.set_default_size(920, 640)
+        self.set_icon_name("neo-taches")
+        self.mesures = Mesures()
+        self.procs = {}
+        self.io = {}
+        self.iters = {}
+        self.recherche = ""
+        self.ouvert = set()
+
+        boite = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.add(boite)
+        barre = Gtk.Box(spacing=8)
+        for cote in ("top", "bottom", "start", "end"):
+            getattr(barre, "set_margin_" + cote)(8)
+        self.champ = Gtk.SearchEntry(placeholder_text="Rechercher un processus (nom ou commande)")
+        self.champ.set_size_request(320, -1)
+        self.champ.connect("search-changed", self.filtrer)
+        barre.pack_start(self.champ, False, False, 0)
+        self.bouton_fin = Gtk.Button(label="Fin de tâche")
+        self.bouton_fin.set_sensitive(False)
+        self.bouton_fin.connect("clicked", lambda _b: self.fin_de_tache())
+        liberer = Gtk.Button(label="Libérer de la RAM…")
+        liberer.get_style_context().add_class("suggested-action")
+        liberer.connect("clicked", lambda _b: LibererRAM(self).run_et_detruire())
+        barre.pack_end(liberer, False, False, 0)
+        barre.pack_end(self.bouton_fin, False, False, 0)
+        boite.pack_start(barre, False, False, 0)
+
+        self.onglets = Gtk.Notebook()
+        boite.pack_start(self.onglets, True, True, 0)
+        self.onglets.append_page(self.page_processus(), Gtk.Label(label="Processus"))
+        self.onglets.append_page(self.page_performances(), Gtk.Label(label="Performances"))
+        self.onglets.append_page(PageDemarrage(self), Gtk.Label(label="Démarrage"))
+
+        self.etat = Gtk.Label(xalign=0)
+        self.etat.set_margin_start(10)
+        self.etat.set_margin_bottom(6)
+        boite.pack_start(self.etat, False, False, 0)
+        self.connect("key-press-event", self.touche)
+        self.rafraichir_processus()
+        self.tic()
+        GLib.timeout_add(1000, self.tic)
+        GLib.timeout_add(2000, self.rafraichir_processus)
+
+    # ---- Processus ----
+    def page_processus(self):
+        self.store = Gtk.TreeStore(*self.COLS)
+        self.filtre = self.store.filter_new()
+        self.filtre.set_visible_func(self.visible)
+        self.trie = Gtk.TreeModelSort(model=self.filtre)
+        self.vue = Gtk.TreeView(model=self.trie)
+        self.vue.set_enable_search(False)
+        col = Gtk.TreeViewColumn("Nom")
+        ic = Gtk.CellRendererPixbuf()
+        tx = Gtk.CellRendererText(ellipsize=Pango.EllipsizeMode.END)
+        col.pack_start(ic, False)
+        col.pack_start(tx, True)
+        col.add_attribute(ic, "icon-name", 1)
+        col.add_attribute(tx, "text", 0)
+        col.add_attribute(tx, "weight", 11)
+        col.set_expand(True)
+        col.set_resizable(True)
+        col.set_sort_column_id(0)
+        self.vue.append_column(col)
+        rp = Gtk.CellRendererText(xalign=1.0)
+        cp = Gtk.TreeViewColumn("PID", rp)
+        cp.set_cell_data_func(rp, lambda c, r, m, it, d: r.set_property("text", str(m[it][2]) if m[it][2] else ""))
+        cp.set_sort_column_id(2)
+        self.vue.append_column(cp)
+        for titre, txt, tri in ( ("Processeur", 3, 4), ("Mémoire (privée)", 5, 6),
+                                ("Disque", 7, 8), ("État", 9, 9)):
+            r = Gtk.CellRendererText(xalign=1.0 if titre not in ("État",) else 0.0)
+            c = Gtk.TreeViewColumn(titre, r, text=txt)
+            c.set_sort_column_id(tri)
+            c.set_resizable(True)
+            c.add_attribute(r, "weight", 11)
+            self.vue.append_column(c)
+        self.trie.set_sort_column_id(6, Gtk.SortType.DESCENDING)
+        self.vue.get_selection().connect("changed", self.selection_changee)
+        self.vue.connect("row-expanded", lambda v, it, p: self.ouvert.add(self.trie[it][10]))
+        self.vue.connect("row-collapsed", lambda v, it, p: self.ouvert.discard(self.trie[it][10]))
+        self.vue.connect("button-press-event", self.clic)
+        defil = Gtk.ScrolledWindow()
+        defil.add(self.vue)
+        return defil
+
+    def visible(self, model, it, _d):
+        if not self.recherche:
+            return True
+        cle = model[it][10]
+        if cle.startswith("groupe:"):
+            return True
+        if self.recherche in model[it][0].lower():
+            return True
+        p = self.procs.get(model[it][2])
+        if p is not None:
+            try:
+                return self.recherche in " ".join(p.cmdline()).lower()
+            except psutil.Error:
+                return False
+        return False
+
+    def filtrer(self, champ):
+        self.recherche = champ.get_text().strip().lower()
+        self.filtre.refilter()
+        if self.recherche:
+            self.vue.expand_all()
+
+    def lire_processus(self):
+        infos = {}
+        for p in psutil.process_iter(["pid", "ppid", "name", "uids", "status"]):
+            pid = p.info["pid"]
+            if pid not in self.procs:
+                self.procs[pid] = p
+                p.cpu_percent()
+            q = self.procs[pid]
+            try:
+                cpu = q.cpu_percent() / NCPU
+                mi = q.memory_info()
+                prive = max(mi.rss - getattr(mi, "shared", 0), 0)
+                disque = None
+                if p.info["uids"] and p.info["uids"].real == MOI:
+                    try:
+                        io = q.io_counters()
+                        tot = io.read_bytes + io.write_bytes
+                        a = self.io.get(pid)
+                        maintenant = time.monotonic()
+                        disque = (tot - a[0]) / max(maintenant - a[1], 0.001) if a else 0.0
+                        self.io[pid] = (tot, maintenant)
+                    except psutil.Error:
+                        disque = None
+            except psutil.Error:
+                continue
+            infos[pid] = dict(pid=pid, ppid=p.info["ppid"], nom=p.info["name"] or "?",
+                              uid=p.info["uids"].real if p.info["uids"] else -1,
+                              statut=p.info["status"], cpu=cpu, mem=prive, disque=disque)
+        for pid in list(self.procs):
+            if pid not in infos:
+                self.procs.pop(pid, None)
+                self.io.pop(pid, None)
+        return infos
+
+    def classer(self, infos):
+        """Applications (fenêtre ouverte, avec leurs descendants), arrière-plan, système."""
+        fen = fenetres()
+        self.fenetres = fen
+        racines = {pid for pid in fen if pid in infos and infos[pid]["uid"] == MOI}
+        appartient = {}
+        for pid, i in infos.items():
+            q, vus = pid, set()
+            while q and q not in vus:
+                vus.add(q)
+                if q in racines:
+                    appartient[pid] = q
+                    break
+                q = infos.get(q, {}).get("ppid")
+        return racines, appartient
+
+    def libelle(self, i):
+        return NOMS.get(i["nom"], i["nom"])
+
+    def ligne(self, i, gras=False):
+        etat = {"stopped": "Suspendu", "zombie": "Terminé (zombie)", "disk-sleep": "Attente disque"}.get(i["statut"], "")
+        if i["nom"] in PROTEGES or i["pid"] == os.getpid():
+            etat = (etat + " · " if etat else "") + "Protégé"
+        disque_txt = INDISPO if i["disque"] is None else debit(i["disque"])
+        return [self.libelle(i), "", i["pid"], "%.1f %%" % i["cpu"], i["cpu"], taille(i["mem"]), float(i["mem"]),
+                disque_txt, i["disque"] or 0.0, etat, "proc:%d" % i["pid"], 700 if gras else 400]
+
+    def rafraichir_processus(self):
+        if self.onglets.get_current_page() != 0 and self.iters:
+            return True
+        infos = self.lire_processus()
+        racines, appartient = self.classer(infos)
+        voulu = {}  # clé → (clé parent, valeurs)
+        groupes = {"groupe:apps": "Applications", "groupe:fond": "Processus en arrière-plan",
+                   "groupe:sys": "Processus du système"}
+        compte = {k: 0 for k in groupes}
+        for pid, i in infos.items():
+            if pid in racines:
+                enfants = [infos[p] for p, r in appartient.items() if r == pid and p != pid]
+                tot = dict(i, cpu=i["cpu"] + sum(e["cpu"] for e in enfants),
+                           mem=i["mem"] + sum(e["mem"] for e in enfants),
+                           disque=None if i["disque"] is None else i["disque"] + sum(e["disque"] or 0 for e in enfants))
+                v = self.ligne(tot, gras=True)
+                v[0] = "%s%s" % (self.libelle(i), " (%d)" % (len(enfants) + 1) if enfants else "")
+                v[1] = "application-x-executable"
+                v[10] = "app:%d" % pid
+                voulu["app:%d" % pid] = ("groupe:apps", v)
+                voulu["proc:%d" % pid] = ("app:%d" % pid, self.ligne(i))
+                compte["groupe:apps"] += 1
+            elif pid in appartient:
+                voulu["proc:%d" % pid] = ("app:%d" % appartient[pid], self.ligne(i))
+            elif i["uid"] == MOI:
+                voulu["proc:%d" % pid] = ("groupe:fond", self.ligne(i))
+                compte["groupe:fond"] += 1
+            else:
+                voulu["proc:%d" % pid] = ("groupe:sys", self.ligne(i))
+                compte["groupe:sys"] += 1
+        for k, nom in groupes.items():
+            voulu[k] = (None, ["%s (%d)" % (nom, compte[k]), "", 0, "", 0.0, "", 0.0, "", 0.0, "", k, 700])
+        self.appliquer(voulu)
+        self.etat.set_text("%d processus · Processeur %.0f %% · Mémoire utilisée %.0f %%" % (
+            len(infos), self.mesures.histo["cpu"][-1] if self.mesures.histo["cpu"] else 0,
+            self.mesures.histo["ram"][-1] if self.mesures.histo["ram"] else 0))
+        return True
+
+    def appliquer(self, voulu):
+        # supprimer ce qui a disparu ou changé de parent (enfants d'abord)
+        for cle in sorted(self.iters, key=lambda k: -self.store.iter_depth(self.iters[k])):
+            it = self.iters[cle]
+            parent = self.store.iter_parent(it)
+            cle_parent = self.store[parent][10] if parent else None
+            if cle not in voulu or voulu[cle][0] != cle_parent:
+                self.supprimer(cle)
+        premier = not self.iters
+        for profondeur in range(3):
+            for cle, (cp, v) in voulu.items():
+                if (cp is None) != (profondeur == 0):
+                    continue
+                if profondeur == 1 and cp not in ("groupe:apps", "groupe:fond", "groupe:sys"):
+                    continue
+                if profondeur == 2 and not cp.startswith("app:"):
+                    continue
+                if cle in self.iters:
+                    for n, x in enumerate(v):
+                        if self.store[self.iters[cle]][n] != x:
+                            self.store[self.iters[cle]][n] = x
+                elif cp is None or cp in self.iters:
+                    self.iters[cle] = self.store.append(self.iters.get(cp), v)
+        if premier:
+            for g in ("groupe:apps", "groupe:fond"):
+                self.ouvert.add(g)
+        for cle in list(self.ouvert):
+            it = self.iters.get(cle)
+            if it:
+                ok, f = self.filtre.convert_child_iter_to_iter(it)
+                if ok:
+                    ok2, s = self.trie.convert_child_iter_to_iter(f)
+                    if ok2:
+                        self.vue.expand_row(self.trie.get_path(s), False)
+
+    def supprimer(self, cle):
+        it = self.iters.pop(cle, None)
+        if it is None:
+            return
+        enfant = self.store.iter_children(it)
+        while enfant:
+            suivant = self.store.iter_next(enfant)
+            self.supprimer(self.store[enfant][10])
+            enfant = suivant
+        self.store.remove(it)
+
+    def selection(self):
+        model, it = self.vue.get_selection().get_selected()
+        return model[it][10] if it else None
+
+    def selection_changee(self, _s):
+        cle = self.selection()
+        self.bouton_fin.set_sensitive(bool(cle) and not cle.startswith("groupe:"))
+
+    def clic(self, vue, ev):
+        if ev.button != 3:
+            return False
+        res = vue.get_path_at_pos(int(ev.x), int(ev.y))
+        if not res:
+            return False
+        vue.get_selection().select_path(res[0])
+        menu = Gtk.Menu()
+        for texte, action in (("Fin de tâche", self.fin_de_tache),
+                              ("Ouvrir l'emplacement du fichier", self.emplacement),
+                              ("Propriétés", self.proprietes)):
+            m = Gtk.MenuItem(label=texte)
+            m.connect("activate", lambda _m, a=action: a())
+            menu.append(m)
+        menu.show_all()
+        menu.popup_at_pointer(ev)
+        return True
+
+    def touche(self, _w, ev):
+        if ev.keyval == Gdk.KEY_Delete and self.onglets.get_current_page() == 0:
+            self.fin_de_tache()
+            return True
+        if ev.keyval == Gdk.KEY_f and ev.state & Gdk.ModifierType.CONTROL_MASK:
+            self.champ.grab_focus()
+            return True
+        return False
+
+    def pid_selection(self):
+        cle = self.selection()
+        if not cle or cle.startswith("groupe:"):
+            return None, None
+        return cle.split(":")[0], int(cle.split(":")[1])
+
+    def emplacement(self):
+        _, pid = self.pid_selection()
+        try:
+            exe = psutil.Process(pid).exe()
+            subprocess.Popen(["thunar", os.path.dirname(exe)])
+        except (psutil.Error, OSError, TypeError):
+            E.dialogue("NEO-TCH-002", "Emplacement inaccessible", self)
+
+    def proprietes(self):
+        _, pid = self.pid_selection()
+        try:
+            p = psutil.Process(pid)
+            txt = ("PID : %d\nNom : %s\nUtilisateur : %s\nDémarré : %s\nCommande : %s"
+                   % (pid, p.name(), p.username(), time.strftime("%d/%m/%Y %H:%M:%S", time.localtime(p.create_time())),
+                      " ".join(p.cmdline()) or "—"))
+        except psutil.Error:
+            txt = E.texte("NEO-TCH-004")
+        d = Gtk.MessageDialog(transient_for=self, message_type=Gtk.MessageType.INFO,
+                              buttons=Gtk.ButtonsType.CLOSE, text="Propriétés du processus")
+        d.format_secondary_text(txt)
+        d.run()
+        d.destroy()
+
+    # ---- Fin de tâche ----
+    def fin_de_tache(self):
+        genre, pid = self.pid_selection()
+        if pid is None:
+            return
+        try:
+            p = psutil.Process(pid)
+            nom, uid = p.name(), p.uids().real
+        except psutil.Error:
+            E.dialogue("NEO-TCH-004", parent=self)
+            return
+        if uid != MOI:
+            E.dialogue("NEO-TCH-002", "%s (PID %d, utilisateur %s)" % (nom, pid, p.username()), self)
+            return
+        if nom in PROTEGES or pid == os.getpid():
+            E.dialogue("NEO-TCH-001", "%s (PID %d)" % (nom, pid), self)
+            return
+        cibles = [p]
+        if genre == "app":
+            cibles += [c for c in p.children(recursive=True)]
+        fermer_proprement(pid, self.fenetres.get(pid, []) if genre == "app" else [], cibles)
+        GLib.timeout_add(5000, self.verifier_arret, cibles, nom)
+
+    def verifier_arret(self, cibles, nom):
+        vivants = [c for c in cibles if c.is_running() and c.status() != psutil.STATUS_ZOMBIE]
+        if not vivants:
+            return False
+        d = Gtk.MessageDialog(transient_for=self, message_type=Gtk.MessageType.WARNING,
+                              buttons=Gtk.ButtonsType.NONE,
+                              text="Avertissement NEO-TCH-003 — « %s » ne répond pas" % NOMS.get(nom, nom))
+        _, _, expl, sol = E.fiche("NEO-TCH-003")
+        d.format_secondary_text("%s\n\nQue faire : %s" % (expl, sol))
+        d.add_button("Attendre", Gtk.ResponseType.CANCEL)
+        b = d.add_button("Forcer l'arrêt", Gtk.ResponseType.OK)
+        b.get_style_context().add_class("destructive-action")
+        if d.run() == Gtk.ResponseType.OK:
+            for c in vivants:
+                try:
+                    c.kill()
+                except psutil.Error:
+                    pass
+        d.destroy()
+        return False
+
+    # ---- Performances ----
+    def page_performances(self):
+        page = Gtk.Paned()
+        self.liste_perf = Gtk.ListBox()
+        self.liste_perf.get_style_context().add_class("sidebar")
+        self.elements = []
+        disques = sorted(self.mesures.disques) or ["—"]
+        reseaux = sorted(n for n in psutil.net_io_counters(pernic=True) if n != "lo") or ["—"]
+        defs = [("cpu", "Processeur", BLEU, False)] + [("ram", "Mémoire", MENTHE, False)]
+        defs += [("disque:" + d, "Disque (%s)" % d, VERT_EAU, False) for d in disques]
+        defs += [("reseau:" + n, "Réseau (%s)" % n, BLEU, True) for n in reseaux]
+        defs += [("gpu", "Carte graphique", MENTHE, False)]
+        for cle, titre, coul, double in defs:
+            ligne = Gtk.ListBoxRow()
+            b = Gtk.Box(spacing=8)
+            for cote in ("top", "bottom", "start", "end"):
+                getattr(b, "set_margin_" + cote)(6)
+            g = Graphe(coul, None if double else 100.0, mini=True, double=double)
+            b.pack_start(g, False, False, 0)
+            v = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            t = Gtk.Label(xalign=0)
+            t.set_markup("<b>%s</b>" % GLib.markup_escape_text(titre))
+            val = Gtk.Label(xalign=0)
+            v.pack_start(t, False, False, 0)
+            v.pack_start(val, False, False, 0)
+            b.pack_start(v, True, True, 0)
+            ligne.add(b)
+            ligne.cle = cle
+            self.liste_perf.add(ligne)
+            self.elements.append((cle, titre, coul, double, g, val))
+        self.liste_perf.connect("row-selected", lambda *_: self.maj_detail(True))
+        page.pack1(self.liste_perf, False, False)
+        droite = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        for cote in ("top", "bottom", "start", "end"):
+            getattr(droite, "set_margin_" + cote)(14)
+        self.titre_detail = Gtk.Label(xalign=0)
+        droite.pack_start(self.titre_detail, False, False, 0)
+        self.sous_titre = Gtk.Label(xalign=0)
+        self.sous_titre.set_line_wrap(True)
+        droite.pack_start(self.sous_titre, False, False, 0)
+        self.grand = Graphe(BLEU)
+        droite.pack_start(self.grand, True, True, 0)
+        self.composition = Gtk.DrawingArea()
+        self.composition.set_size_request(-1, 22)
+        self.composition.connect("draw", self.dessiner_composition)
+        droite.pack_start(self.composition, False, False, 0)
+        self.grille = Gtk.Grid(column_spacing=28, row_spacing=6)
+        droite.pack_start(self.grille, False, False, 0)
+        page.pack2(droite, True, False)
+        page.set_position(260)
+        self.liste_perf.select_row(self.liste_perf.get_row_at_index(0))
+        return page
+
+    def tic(self):
+        self.mesures.echantillon()
+        m, h = self.mesures, self.mesures.histo
+        mem = memoire_detaillee()
+        for cle, titre, coul, double, g, val in self.elements:
+            if cle == "cpu":
+                g.maj(h["cpu"])
+                val.set_text("%.0f %%" % h["cpu"][-1])
+            elif cle == "ram":
+                g.maj(h["ram"])
+                val.set_text("%.1f / %.1f Go (%.0f %%)" % (mem["utilisee"] / 1e9, mem["total"] / 1e9, h["ram"][-1]))
+            elif cle.startswith("disque:"):
+                d = cle.split(":", 1)[1]
+                g.maj(h["disque"].get(d, []))
+                v = m.vitesses_disques.get(d)
+                val.set_text("%.0f %%" % v[2] if v else INDISPO)
+            elif cle.startswith("reseau:"):
+                n = cle.split(":", 1)[1]
+                g.maj(h["reseau"].get(n, []))
+                v = m.vitesses_reseau.get(n)
+                val.set_text("R : %s  E : %s" % (debit(v[0]), debit(v[1])) if v else INDISPO)
+            elif cle == "gpu":
+                if m.gpu["charge"] is None:
+                    g.maj([], "N/D")
+                    val.set_text("Utilisation : %s" % INDISPO)
+                else:
+                    g.maj(h["gpu"])
+                    val.set_text("%.0f %%" % m.gpu["charge"])
+        self.maj_detail(False)
+        return True
+
+    def maj_detail(self, change):
+        ligne = self.liste_perf.get_selected_row()
+        if not ligne or not self.mesures.histo["cpu"]:
+            return
+        cle = ligne.cle
+        el = next(e for e in self.elements if e[0] == cle)
+        _, titre, coul, double, _, _ = el
+        m, h = self.mesures, self.mesures.histo
+        mem = memoire_detaillee()
+        self.grand.couleur, self.grand.double = coul, double
+        self.grand.maxi = None if double else 100.0
+        self.composition.set_visible(cle == "ram")
+        infos = []
+        sous = ""
+        if cle == "cpu":
+            modele = next((l.split(":", 1)[1].strip() for l in open("/proc/cpuinfo") if l.startswith("model name")), INDISPO)
+            freq = psutil.cpu_freq()
+            sous = modele
+            self.grand.maj(h["cpu"])
+            infos = [("Utilisation", "%.0f %%" % h["cpu"][-1]),
+                     ("Vitesse", "%.2f GHz" % (freq.current / 1000) if freq else INDISPO),
+                     ("Processus", str(len(psutil.pids()))),
+                     ("Cœurs physiques", str(psutil.cpu_count(logical=False) or INDISPO)),
+                     ("Processeurs logiques", str(NCPU)),
+                     ("Durée de fonctionnement", time.strftime("%H:%M:%S", time.gmtime(time.time() - psutil.boot_time())))]
+        elif cle == "ram":
+            sous = "La mémoire « en cache » contient des fichiers récemment lus ; elle est libérée automatiquement dès qu'un programme en a besoin."
+            self.grand.maj(h["ram"])
+            z = mem["zram"]
+            infos = [("Utilisée", taille(mem["utilisee"])), ("Disponible", taille(mem["disponible"])),
+                     ("En cache (libérable)", taille(mem["cache"])), ("Libre (inoccupée)", taille(mem["libre"])),
+                     ("Partagée / tmpfs", taille(mem["partagee"])), ("Total", taille(mem["total"])),
+                     ("Swap compressé (zram)", "%s stockés dans %s de RAM" % (taille(z[0]), taille(z[1])) if z else INDISPO),
+                     ("Swap utilisé", "%s sur %s" % (taille(mem["swap_utilise"]), taille(mem["swap_total"])))]
+        elif cle.startswith("disque:"):
+            d = cle.split(":", 1)[1]
+            modele = lire("/sys/block/%s/device/model" % d) or INDISPO
+            rot = lire("/sys/block/%s/queue/rotational" % d)
+            sous = "%s · %s" % (modele, {"1": "disque dur mécanique (HDD)", "0": "SSD"}.get(rot, "type " + INDISPO))
+            self.grand.maj(h["disque"].get(d, []))
+            v = m.vitesses_disques.get(d, (0, 0, 0))
+            tailleo = int(lire("/sys/block/%s/size" % d) or 0) * 512
+            infos = [("Temps d'activité", "%.0f %%" % v[2]), ("Lecture", debit(v[0])), ("Écriture", debit(v[1])),
+                     ("Capacité", "%.0f Go" % (tailleo / 1e9) if tailleo else INDISPO),
+                     ("Ordonnanceur", (lire("/sys/block/%s/queue/scheduler" % d) or INDISPO))]
+        elif cle.startswith("reseau:"):
+            n = cle.split(":", 1)[1]
+            self.grand.maj(h["reseau"].get(n, []))
+            v = m.vitesses_reseau.get(n, (0, 0))
+            adr = [a.address for a in psutil.net_if_addrs().get(n, []) if a.family == 2]
+            vitesse = lire("/sys/class/net/%s/speed" % n)
+            sous = "Courbe bleue : réception · courbe menthe : envoi"
+            infos = [("Réception", debit(v[0])), ("Envoi", debit(v[1])), ("Adresse IPv4", ", ".join(adr) or INDISPO),
+                     ("Débit de la liaison", "%s Mbit/s" % vitesse if vitesse and vitesse.lstrip("-").isdigit() and int(vitesse) > 0 else INDISPO),
+                     ("Par application", INDISPO)]
+        elif cle == "gpu":
+            g = m.gpu
+            sous = g["nom"]
+            if g["charge"] is None:
+                self.grand.maj([], INDISPO)
+            else:
+                self.grand.maj(h["gpu"])
+            infos = [("Pilote", g["pilote"]),
+                     ("Utilisation", INDISPO if g["charge"] is None else "%.0f %%" % g["charge"]),
+                     ("Mémoire vidéo utilisée", INDISPO if g["vram"] is None else taille(g["vram"])),
+                     ("Mémoire vidéo totale", INDISPO if g["vram_total"] is None else taille(g["vram_total"]))]
+            if g["charge"] is None or g["vram"] is None:
+                infos.append(("Pourquoi « Indisponible » ?", g["raison"]))
+        self.titre_detail.set_markup("<span size='x-large' weight='bold'>%s</span>" % GLib.markup_escape_text(titre))
+        self.sous_titre.set_text(sous)
+        for e in self.grille.get_children():
+            self.grille.remove(e)
+        for n, (k, v) in enumerate(infos):
+            a = Gtk.Label(label=k, xalign=0)
+            a.get_style_context().add_class("dim-label")
+            b = Gtk.Label(xalign=0)
+            b.set_markup("<b>%s</b>" % GLib.markup_escape_text(v))
+            b.set_line_wrap(True)
+            b.set_max_width_chars(60)
+            self.grille.attach(a, (n % 2) * 2, n // 2, 1, 1)
+            self.grille.attach(b, (n % 2) * 2 + 1, n // 2, 1, 1)
+        self.grille.show_all()
+        self.composition.queue_draw()
+
+    def dessiner_composition(self, w, cr):
+        """Barre « Composition de la mémoire » : utilisée | en cache | libre."""
+        mem = memoire_detaillee()
+        a = w.get_allocation()
+        x = 0
+        for valeur, coul, alpha in ((mem["utilisee"], BLEU, 0.9), (mem["cache"], MENTHE, 0.7),
+                                    (mem["libre"], VERT_EAU, 0.25)):
+            l = a.width * valeur / float(mem["total"])
+            cr.set_source_rgba(coul[0], coul[1], coul[2], alpha)
+            cr.rectangle(x, 0, l, a.height)
+            cr.fill()
+            x += l
+
+
+def fermer_proprement(pid, ids_fenetres, cibles):
+    """Demande la fermeture des fenêtres (comme Alt+F4 : l'application peut
+    proposer d'enregistrer), puis SIGTERM aux processus sans fenêtre."""
+    for wid in ids_fenetres:
+        subprocess.run(["wmctrl", "-i", "-c", wid], timeout=3)
+    if not ids_fenetres:
+        for c in cibles:
+            try:
+                c.send_signal(signal.SIGTERM)
+            except psutil.Error:
+                pass
+
+
+# --- Démarrage -----------------------------------------------------------------
+
+ESSENTIELS = {"neo-session", "neo-animations", "xfsettingsd", "polkit-mate-authentication-agent-1",
+              "xfce4-notifyd", "at-spi-dbus-bus", "pulseaudio", "xdg-user-dirs"}
+
+
+class PageDemarrage(Gtk.Box):
+    def __init__(self, fen):
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self.fen = fen
+        for cote in ("top", "bottom", "start", "end"):
+            getattr(self, "set_margin_" + cote)(8)
+        info = Gtk.Label(xalign=0)
+        info.set_line_wrap(True)
+        info.set_text("Programmes lancés à l'ouverture de session. Désactiver un programme ne le désinstalle pas. "
+                      "« Impact au démarrage » : Indisponible (non mesuré par Néo OS).")
+        self.pack_start(info, False, False, 0)
+        self.store = Gtk.ListStore(bool, str, str, str, str, bool)  # actif, nom, description, origine, id, essentiel
+        vue = Gtk.TreeView(model=self.store)
+        r = Gtk.CellRendererToggle()
+        r.connect("toggled", self.basculer)
+        vue.append_column(Gtk.TreeViewColumn("Activé", r, active=0))
+        for t, i in (("Nom", 1), ("Description", 2), ("Origine", 3)):
+            c = Gtk.TreeViewColumn(t, Gtk.CellRendererText(ellipsize=Pango.EllipsizeMode.END), text=i)
+            c.set_resizable(True)
+            c.set_expand(i == 2)
+            if i == 1:
+                c.set_min_width(220)
+            c.set_sort_column_id(i)
+            vue.append_column(c)
+        defil = Gtk.ScrolledWindow()
+        defil.add(vue)
+        self.pack_start(defil, True, True, 0)
+        self.charger()
+
+    @staticmethod
+    def dossiers():
+        perso = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "autostart")
+        systeme = [os.path.join(d, "autostart") for d in os.environ.get("XDG_CONFIG_DIRS", "/etc/xdg").split(":") if d]
+        return perso, systeme
+
+    @staticmethod
+    def lire_entree(chemin):
+        c = configparser.RawConfigParser(strict=False, interpolation=None)
+        c.optionxform = str
+        try:
+            c.read(chemin, encoding="utf-8")
+            return dict(c["Desktop Entry"])
+        except (configparser.Error, KeyError, OSError):
+            return {}
+
+    def charger(self):
+        self.store.clear()
+        perso, systeme = self.dossiers()
+        entrees = {}
+        for d in reversed(systeme):
+            for f in glob.glob(d + "/*.desktop"):
+                entrees[os.path.basename(f)] = (f, "Système")
+        for f in glob.glob(perso + "/*.desktop"):
+            entrees[os.path.basename(f)] = (f, "Utilisateur")
+        for nom, (f, origine) in sorted(entrees.items()):
+            e = self.lire_entree(f)
+            if not e:
+                continue
+            seul = e.get("OnlyShowIn", "")
+            if seul and "XFCE" not in seul.split(";"):
+                continue
+            if "XFCE" in e.get("NotShowIn", "").split(";"):
+                continue
+            ident = nom[:-8]
+            actif = e.get("Hidden", "false").lower() != "true"
+            if e.get("NoDisplay", "false").lower() == "true" and ident not in ESSENTIELS and not ident.startswith("neo-"):
+                pass
+            self.store.append([actif, e.get("Name[fr]", e.get("Name", ident)),
+                               e.get("Comment[fr]", e.get("Comment", "")), origine, ident, ident in ESSENTIELS])
+
+    def basculer(self, _r, chemin):
+        ligne = self.store[chemin]
+        actif, ident, essentiel = ligne[0], ligne[4], ligne[5]
+        if essentiel and actif:
+            E.dialogue("NEO-TCH-001", "Élément de démarrage : %s" % ident, self.fen)
+            return
+        perso, systeme = self.dossiers()
+        os.makedirs(perso, exist_ok=True)
+        cible = os.path.join(perso, ident + ".desktop")
+        if actif:
+            source = next((os.path.join(d, ident + ".desktop") for d in systeme
+                           if os.path.exists(os.path.join(d, ident + ".desktop"))), None)
+            if os.path.exists(cible):
+                contenu = open(cible).read()
+            elif source:
+                contenu = open(source).read()
+            else:
+                contenu = "[Desktop Entry]\nType=Application\nName=%s\n" % ident
+            lignes = [l for l in contenu.splitlines() if not l.startswith(("Hidden=", "X-Neo-Desactive="))]
+            i = next((n for n, l in enumerate(lignes) if l.strip() == "[Desktop Entry]"), 0)
+            lignes[i + 1:i + 1] = ["Hidden=true", "X-Neo-Desactive=true"]
+            with open(cible, "w") as f:
+                f.write("\n".join(lignes) + "\n")
+        else:
+            if os.path.exists(cible):
+                contenu = open(cible).read()
+                if "X-Neo-Desactive=true" in contenu and any(os.path.exists(os.path.join(d, ident + ".desktop")) for d in systeme):
+                    os.remove(cible)
+                else:
+                    with open(cible, "w") as f:
+                        f.write("\n".join(l for l in contenu.splitlines()
+                                          if not l.startswith(("Hidden=", "X-Neo-Desactive="))) + "\n")
+        self.charger()
+
+
+# --- Libérer de la RAM -----------------------------------------------------------
+
+class LibererRAM(Gtk.Dialog):
+    def __init__(self, fen):
+        super().__init__(title="Libérer de la RAM", transient_for=fen, modal=True)
+        self.fen = fen
+        self.set_default_size(620, 520)
+        z = self.get_content_area()
+        z.set_spacing(10)
+        for cote in ("top", "bottom", "start", "end"):
+            getattr(z, "set_margin_" + cote)(14)
+        self.resume = Gtk.Label(xalign=0)
+        self.resume.set_line_wrap(True)
+        z.pack_start(self.resume, False, False, 0)
+        t = Gtk.Label(xalign=0)
+        t.set_markup("<b>Applications ouvertes</b> — cochez celles à fermer (rien n'est coché d'avance). "
+                     "Chaque application reçoit une demande de fermeture normale et peut vous proposer "
+                     "d'enregistrer votre travail.")
+        t.set_line_wrap(True)
+        z.pack_start(t, False, False, 0)
+        self.store = Gtk.ListStore(bool, str, str, float, int, object)
+        vue = Gtk.TreeView(model=self.store)
+        r = Gtk.CellRendererToggle()
+        r.connect("toggled", self.cocher)
+        vue.append_column(Gtk.TreeViewColumn("Fermer", r, active=0))
+        c = Gtk.TreeViewColumn("Application", Gtk.CellRendererText(), text=1)
+        c.set_expand(True)
+        vue.append_column(c)
+        vue.append_column(Gtk.TreeViewColumn("Mémoire (privée)", Gtk.CellRendererText(xalign=1), text=2))
+        defil = Gtk.ScrolledWindow()
+        defil.set_min_content_height(170)
+        defil.add(vue)
+        z.pack_start(defil, True, True, 0)
+        conseil = Gtk.Label(xalign=0)
+        conseil.set_line_wrap(True)
+        conseil.set_markup("<b>Sans rien fermer :</b> dans Firefox, la page <tt>about:unloads</tt> décharge les "
+                           "onglets inactifs (ils se rechargent quand vous y revenez).")
+        z.pack_start(conseil, False, False, 0)
+        b = Gtk.Button(label="Ouvrir about:unloads dans Firefox")
+        b.connect("clicked", lambda _b: subprocess.Popen(["firefox-esr", "about:unloads"]))
+        b.set_halign(Gtk.Align.START)
+        z.pack_start(b, False, False, 0)
+        self.add_button("Fermer la fenêtre", Gtk.ResponseType.CLOSE)
+        self.bouton = self.add_button("Fermer les applications cochées", Gtk.ResponseType.APPLY)
+        self.bouton.get_style_context().add_class("destructive-action")
+        self.bouton.set_sensitive(False)
+        self.charger()
+        self.show_all()
+
+    def maj_resume(self, extra=""):
+        m = memoire_detaillee()
+        self.resume.set_markup(
+            "<b>Utilisée :</b> %s   <b>Disponible :</b> %s   <b>En cache :</b> %s\n"
+            "<small>La mémoire « en cache » n'est pas perdue : elle garde des fichiers récemment lus et se libère "
+            "seule dès qu'un programme en a besoin. Seule la fermeture d'applications réduit la mémoire utilisée.</small>%s"
+            % (taille(m["utilisee"]), taille(m["disponible"]), taille(m["cache"]), extra))
+
+    def charger(self):
+        self.maj_resume()
+        self.store.clear()
+        infos = self.fen.lire_processus()
+        racines, appartient = self.fen.classer(infos)
+        for pid in racines:
+            i = infos[pid]
+            if i["nom"] in PROTEGES:
+                continue
+            total = i["mem"] + sum(infos[p]["mem"] for p, r in appartient.items() if r == pid and p != pid)
+            self.store.append([False, NOMS.get(i["nom"], i["nom"]), taille(total), float(total), pid,
+                               self.fen.fenetres.get(pid, [])])
+        self.store.set_sort_column_id(3, Gtk.SortType.DESCENDING)
+
+    def cocher(self, _r, chemin):
+        self.store[chemin][0] = not self.store[chemin][0]
+        self.bouton.set_sensitive(any(l[0] for l in self.store))
+
+    def run_et_detruire(self):
+        while True:
+            rep = self.run()
+            if rep != Gtk.ResponseType.APPLY:
+                break
+            choix = [(l[1], l[4], l[5]) for l in self.store if l[0]]
+            noms = "\n".join("• " + c[0] for c in choix)
+            d = Gtk.MessageDialog(transient_for=self, message_type=Gtk.MessageType.QUESTION,
+                                  buttons=Gtk.ButtonsType.NONE, text="Fermer ces applications ?")
+            d.format_secondary_text("%s\n\nLes documents non enregistrés peuvent être perdus si l'application "
+                                    "ne propose pas de les enregistrer." % noms)
+            d.add_button("Annuler", Gtk.ResponseType.CANCEL)
+            d.add_button("Fermer", Gtk.ResponseType.OK).get_style_context().add_class("destructive-action")
+            ok = d.run() == Gtk.ResponseType.OK
+            d.destroy()
+            if not ok:
+                continue
+            avant = memoire_detaillee()["disponible"]
+            cibles = []
+            for nom, pid, fens in choix:
+                try:
+                    p = psutil.Process(pid)
+                    groupe = [p] + p.children(recursive=True)
+                    fermer_proprement(pid, fens, groupe)
+                    cibles.append((nom, groupe))
+                except psutil.Error:
+                    pass
+            fin = time.monotonic() + 10
+            while time.monotonic() < fin and any(c.is_running() and c.status() != psutil.STATUS_ZOMBIE
+                                                 for _, g in cibles for c in g):
+                while Gtk.events_pending():
+                    Gtk.main_iteration()
+                time.sleep(0.2)
+            time.sleep(1.5)
+            apres = memoire_detaillee()["disponible"]
+            restants = [n for n, g in cibles if any(c.is_running() and c.status() != psutil.STATUS_ZOMBIE for c in g)]
+            gain = apres - avant
+            extra = ("\n\n<b>Mémoire récupérée (mesurée) : %s</b> — disponible : %s → %s"
+                     % (taille(max(gain, 0)), taille(avant), taille(apres)))
+            if gain <= 0:
+                extra += "\n<small>Aucun gain mesurable : d'autres programmes ont pu utiliser la mémoire libérée entre-temps.</small>"
+            if restants:
+                extra += ("\n<span foreground='#B3261E'><b>Avertissement NEO-TCH-003</b></span> : toujours ouvert(s) : %s "
+                          "(l'application attend peut-être votre réponse). Utilisez « Fin de tâche » pour forcer l'arrêt."
+                          % ", ".join(restants))
+            self.charger()
+            self.maj_resume(extra)
+            self.bouton.set_sensitive(False)
+        self.destroy()
+
+
+if __name__ == "__main__":
+    if not shutil.which("wmctrl"):
+        print("wmctrl absent : les applications ne pourront pas être regroupées par fenêtre.", file=sys.stderr)
+    import argparse
+    ap = argparse.ArgumentParser(description="Gestionnaire des tâches Néo")
+    ap.add_argument("--onglet", choices=["processus", "performances", "demarrage"], default="processus")
+    ap.add_argument("--liberer", action="store_true", help="ouvrir directement « Libérer de la RAM »")
+    a = ap.parse_args()
+    f = Gestionnaire()
+    f.connect("destroy", Gtk.main_quit)
+    f.show_all()
+    f.onglets.set_current_page(["processus", "performances", "demarrage"].index(a.onglet))
+    if a.liberer:
+        GLib.idle_add(lambda: LibererRAM(f).run_et_detruire())
+    Gtk.main()

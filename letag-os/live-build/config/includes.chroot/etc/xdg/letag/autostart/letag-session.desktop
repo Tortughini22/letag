@@ -1,7 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Letag OS — préparation de la session
-Exec=letag-session
-OnlyShowIn=XFCE;
-NoDisplay=true
-X-XFCE-Autostart-Override=true

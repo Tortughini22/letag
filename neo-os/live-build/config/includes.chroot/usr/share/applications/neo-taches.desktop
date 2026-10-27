@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Gestionnaire des tâches
+GenericName=Processus et performances
+Comment=Processus, performances (processeur, mémoire, disque, réseau, carte graphique), programmes au démarrage, libérer de la RAM
+Exec=neo-taches
+Icon=neo-taches
+Categories=System;Monitor;
+Keywords=processus;tâches;mémoire;ram;processeur;cpu;démarrage;fin de tâche;
+StartupNotify=true

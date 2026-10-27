@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="440" viewBox="0 0 800 440">
+  <rect width="800" height="440" fill="#FEF9EB"/>
+  <circle cx="700" cy="400" r="230" fill="#C6EBD4"/>
+  <circle cx="560" cy="460" r="120" fill="#91D2BC"/>
+  <circle cx="740" cy="250" r="70" fill="#7DCDAD"/>
+  <circle cx="640" cy="215" r="18" fill="#4478AF"/>
+  <circle cx="64" cy="92" r="8" fill="#7DCDAD"/>
+  <text x="86" y="101" font-family="Inter" font-weight="600" font-size="30" fill="#0F2B5B">Toujours à jour</text>
+  <text font-family="Inter" font-size="19" fill="#0F2B5B">
+    <tspan x="64" y="170">Les correctifs de sécurité de Debian s'installent</tspan>
+    <tspan x="64" y="202">automatiquement chaque jour. « Mettre à jour le</tspan>
+    <tspan x="64" y="234">système » applique toutes les autres mises à jour.</tspan>
+  </text>
+</svg>

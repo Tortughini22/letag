@@ -1,0 +1,73 @@
+#!/bin/sh
+# neo-session — lancé à chaque ouverture de session XFCE (autostart).
+# Première fois (ou nouvelle version des réglages) : raccourcis clavier façon
+# Windows, terminal, accès rapide de l'explorateur. À chaque fois : thème et
+# fond d'écran sur les écrans présents.
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/neo"
+VERSION_REGLAGES=2
+mkdir -p "$CONF"
+
+raccourcis() {
+	# Source unique : /usr/share/neo/raccourcis.tsv (voir la fiche « Raccourcis clavier »).
+	grep -v '^#' /usr/share/neo/raccourcis.tsv | while IFS='	' read -r type touche action affichage description; do
+		case "$type" in
+			commande) xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/$touche" -n -t string -s "$action" ;;
+			xfwm4) xfconf-query -c xfce4-keyboard-shortcuts -p "/xfwm4/custom/$touche" -n -t string -s "$action" ;;
+		esac 2>/dev/null
+	done
+	# Anciennes affectations qui entreraient en conflit avec les habitudes Windows
+	xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Super>f" -r 2>/dev/null
+}
+
+acces_rapide() {
+	# Signets GTK : affichés dans le panneau gauche de l'explorateur (Thunar)
+	# et dans les fenêtres « Ouvrir / Enregistrer ».
+	fichier="${XDG_CONFIG_HOME:-$HOME/.config}/gtk-3.0/bookmarks"
+	[ -s "$fichier" ] && return
+	mkdir -p "$(dirname "$fichier")"
+	for d in DESKTOP DOWNLOAD DOCUMENTS PICTURES MUSIC VIDEOS; do
+		chemin=$(xdg-user-dir "$d" 2>/dev/null)
+		[ -n "$chemin" ] && [ "$chemin" != "$HOME" ] && mkdir -p "$chemin" &&
+			printf 'file://%s\n' "$(python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1]))' "$chemin")"
+	done > "$fichier"
+}
+
+if [ "$(cat "$CONF/reglages" 2>/dev/null)" != "$VERSION_REGLAGES" ]; then
+	xdg-user-dirs-update 2>/dev/null
+	raccourcis
+	acces_rapide
+	xfconf-query -c xfce4-terminal -p /font-name -n -t string -s "DejaVu Sans Mono 11" 2>/dev/null
+	xfconf-query -c xfce4-terminal -p /misc-menubar-default -n -t bool -s false 2>/dev/null
+	xfconf-query -c xfce4-terminal -p /scrolling-lines -n -t uint -s 5000 2>/dev/null
+	echo "$VERSION_REGLAGES" > "$CONF/reglages"
+fi
+
+neo-theme appliquer
+
+# Discord (s'il est installé) ne se lance pas à l'ouverture de session :
+# son option « Ouvrir Discord au démarrage » est désactivée par défaut.
+neo-discord reglages >/dev/null 2>&1 || true
+
+# Session live : pas de verrouillage ni de mise en veille de l'écran (une
+# installation dure plusieurs minutes et le mot de passe « live » n'est pas
+# connu de tous), et icône « Installer Néo OS » sur le bureau.
+if [ -d /run/live/medium ]; then
+	xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/dpms-enabled -n -t bool -s false 2>/dev/null
+	xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/blank-on-ac -n -t int -s 0 2>/dev/null
+	xfconf-query -c xfce4-session -p /shutdown/LockScreen -n -t bool -s false 2>/dev/null
+	xset s off -dpms 2>/dev/null
+	# light-locker peut démarrer après ce script : on l'arrête un peu plus tard.
+	(sleep 30; pkill -u "$(id -u)" -x light-locker) >/dev/null 2>&1 &
+fi
+if [ -d /run/live/medium ] && [ -x /usr/local/bin/neo-installer ]; then
+	bureau="$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")"
+	mkdir -p "$bureau"
+	icone="$bureau/neo-installer.desktop"
+	if [ ! -f "$icone" ]; then
+		cp /usr/share/applications/neo-installer.desktop "$icone"
+		chmod +x "$icone"
+		gio set --type=string "$icone" metadata::xfce-exe-checksum \
+			"$(sha256sum "$icone" | cut -d' ' -f1)" 2>/dev/null || true
+	fi
+fi
+exit 0

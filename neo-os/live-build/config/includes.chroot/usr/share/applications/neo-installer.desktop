@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Installer Néo OS
+Comment=Installer Néo OS sur le disque dur (aucun effacement automatique)
+Exec=neo-installer
+Icon=neo-installer
+Categories=System;
+Terminal=false
+StartupNotify=true

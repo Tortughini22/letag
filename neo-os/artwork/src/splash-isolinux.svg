@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480">
+  <rect width="640" height="480" fill="#0F2B5B"/>
+  <circle cx="600" cy="470" r="150" fill="#4478AF" fill-opacity="0.45"/>
+  <circle cx="610" cy="380" r="46" fill="#7DCDAD"/>
+  <g transform="translate(40,42) scale(0.25)">
+    <path d="M58 200 V60 L190 200 V60" fill="none" stroke="#FEF9EB" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="214" cy="40" r="24" fill="#7DCDAD"/>
+  </g>
+  <text x="112" y="80" font-family="Inter" font-weight="600" font-size="30" fill="#FEF9EB">Néo OS</text>
+  <text x="112" y="104" font-family="Inter" font-size="14" fill="#C6EBD4">Système léger pour HP Z200 · base Debian 13</text>
+  <rect x="40" y="136" width="560" height="1" fill="#4478AF"/>
+</svg>

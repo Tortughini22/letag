@@ -1,0 +1,50 @@
+#!/bin/sh
+# neo-animations — niveau d'animation de l'interface Néo OS.
+#   completes   : fenêtres (ouverture, fermeture, réduction, restauration),
+#                 menus, notifications et changements de bureau animés,
+#                 ombres et coins arrondis (compositeur picom, rendu XRender).
+#   reduites    : fondus courts uniquement, ombres conservées.
+#   desactivees : aucun compositeur, aucune animation (le plus économe).
+#   demarrer    : applique le niveau enregistré (ouverture de session).
+#   etat        : affiche le niveau actif.
+# Mode secours (nomodeset, nouveau.noaccel=1) : animations toujours désactivées.
+set -u
+
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/neo"
+mkdir -p "$CONF"
+enregistre() { cat "$CONF/animations" 2>/dev/null || echo completes; }
+secours() { grep -qwE 'nomodeset|nouveau\.noaccel=1' /proc/cmdline; }
+
+appliquer() {
+	niveau="$1"
+	# Un seul compositeur : celui de xfwm4 reste toujours éteint.
+	xfconf-query -c xfwm4 -p /general/use_compositing -n -t bool -s false 2>/dev/null
+	pkill -u "$(id -u)" -x picom 2>/dev/null
+	if secours && [ "$niveau" != desactivees ]; then
+		echo "Mode d'affichage de secours : animations désactivées (code NEO-AFF-004)." >&2
+		niveau=desactivees
+	fi
+	anim=false
+	case "$niveau" in
+		completes|reduites)
+			[ "$niveau" = completes ] && anim=true
+			sleep 0.3
+			setsid picom --config "/usr/share/neo/picom/$niveau.conf" >/dev/null 2>&1 < /dev/null &
+			;;
+	esac
+	# Animations internes de GTK (interrupteurs, panneaux qui se déplient).
+	xfconf-query -c xsettings -p /Gtk/EnableAnimations -n -t bool -s "$anim" 2>/dev/null
+	xfconf-query -c xfce4-notifyd -p /do-fadeout -n -t bool -s "$([ "$niveau" = desactivees ] && echo false || echo true)" 2>/dev/null
+}
+
+case "${1:-etat}" in
+	completes|complètes) echo completes > "$CONF/animations"; appliquer completes ;;
+	reduites|réduites) echo reduites > "$CONF/animations"; appliquer reduites ;;
+	desactivees|désactivées|aucune) echo desactivees > "$CONF/animations"; appliquer desactivees ;;
+	demarrer) appliquer "$(enregistre)" ;;
+	etat)
+		if secours; then echo "desactivees (mode secours)"; else enregistre; fi
+		;;
+	*) echo "Usage : $(basename "$0") completes|reduites|desactivees|demarrer|etat" >&2; exit 2 ;;
+esac
+exit 0

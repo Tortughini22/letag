@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Raccourcis clavier
+GenericName=Fiche récapitulative
+Comment=Les raccourcis façon Windows de Néo OS
+Exec=neo-raccourcis
+Icon=neo-raccourcis
+Categories=Documentation;Settings;
+Keywords=raccourcis;clavier;touches;aide;windows;

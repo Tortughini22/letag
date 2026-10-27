@@ -1,0 +1,30 @@
+/* Néo OS — installateur Calamares aux couleurs de la palette Néo.
+   Crème #FEF9EB (fond), menthe clair #C6EBD4 (surfaces), menthe #7DCDAD
+   (sélection, progression), vert d'eau #91D2BC (survol), bleu #4478AF
+   (action principale), bleu marine #0F2B5B (texte). */
+QWidget { background-color: #FEF9EB; color: #0F2B5B; font-family: "Inter"; }
+QLabel { background: transparent; }
+QPushButton { background-color: #FEF9EB; color: #0F2B5B; border: 1px solid #D6D5D0;
+  border-radius: 7px; padding: 5px 14px; }
+QPushButton:hover { background-color: #91D2BC; }
+QPushButton:pressed { background-color: #7DCDAD; }
+QPushButton:disabled { color: #8D99AD; background-color: #F3EFE2; }
+QPushButton#view-button-next, QPushButton#view-button-install { background-color: #4478AF; color: #FFFFFF; border-color: #4478AF; }
+QPushButton#view-button-next:hover, QPushButton#view-button-install:hover { background-color: #3E6DA0; }
+QPushButton#view-button-next:disabled { background-color: #A9BED6; color: #FEF9EB; }
+QComboBox, QLineEdit, QSpinBox { background-color: #FFFFFF; color: #0F2B5B; border: 1px solid #C9CDD3;
+  border-radius: 6px; padding: 3px 6px; selection-background-color: #7DCDAD; selection-color: #0F2B5B; }
+QLineEdit:focus, QComboBox:focus { border: 2px solid #4478AF; }
+QListView, QTreeView, QTableView { background-color: #FFFFFF; alternate-background-color: #FEF9EB;
+  selection-background-color: #7DCDAD; selection-color: #0F2B5B; border: 1px solid #D6D5D0; }
+QListView::item:hover, QTreeView::item:hover { background-color: #91D2BC; color: #0F2B5B; }
+QProgressBar { background-color: #E7E9E3; border: none; border-radius: 6px; text-align: center; color: #0F2B5B; min-height: 14px; }
+QProgressBar::chunk { background-color: #7DCDAD; border-radius: 6px; }
+QRadioButton::indicator:checked, QCheckBox::indicator:checked { background-color: #4478AF; border: 1px solid #4478AF; border-radius: 3px; }
+QRadioButton::indicator:checked { border-radius: 7px; }
+QRadioButton::indicator, QCheckBox::indicator { width: 14px; height: 14px; border: 1px solid #6A7992; background: #FFFFFF; border-radius: 3px; }
+QRadioButton::indicator { border-radius: 7px; }
+QToolTip { background-color: #0F2B5B; color: #FEF9EB; border: none; padding: 4px; }
+QScrollBar:vertical { background: #FEF9EB; width: 10px; }
+QScrollBar::handle:vertical { background: #C6EBD4; border-radius: 5px; min-height: 30px; }
+#sidebarApp, #sidebarMenuApp { background-color: #0F2B5B; }

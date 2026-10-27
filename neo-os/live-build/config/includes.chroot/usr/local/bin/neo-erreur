@@ -1,0 +1,32 @@
+#!/usr/bin/python3
+"""neo-erreur — affiche un message d'erreur Néo OS identifiable.
+
+  neo-erreur CODE [--details TEXTE] [--gui | --notifier]
+
+Sans option : texte dans le terminal. --gui : boîte de dialogue.
+--notifier : notification de bureau (urgence critique pour les erreurs).
+Code de retour : 0. Les codes sont décrits dans « Codes d'erreur » (aide).
+"""
+import argparse
+import os
+import subprocess
+import sys
+
+sys.path.insert(0, os.environ.get("NEO_LIB", "/usr/local/lib/neo"))
+import neo_erreurs as E  # noqa: E402
+
+p = argparse.ArgumentParser(description="Message d'erreur Néo OS")
+p.add_argument("code")
+p.add_argument("--details")
+p.add_argument("--gui", action="store_true")
+p.add_argument("--notifier", action="store_true")
+a = p.parse_args()
+
+print(E.texte(a.code, a.details), file=sys.stderr)
+if a.gui:
+    E.dialogue(a.code, a.details)
+elif a.notifier:
+    g, titre, expl, sol = E.fiche(a.code)
+    urgence = {"erreur": "critical", "avertissement": "normal"}.get(g, "low")
+    subprocess.run(["notify-send", "-a", "Néo OS", "-u", urgence, "-i", E.ICONES[g],
+                    "%s %s — %s" % (E.LIBELLES[g], a.code, titre), "%s\nQue faire : %s" % (expl, sol)])

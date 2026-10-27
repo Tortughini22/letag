@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Néo OS : gestionnaire de fichiers organisé comme l'Explorateur Windows.
+     Panneau gauche (dossiers habituels, accès rapide, disques et clés USB),
+     barre d'adresse modifiable, recherche, vue « détails » par défaut
+     (Nom, Modifié le, Type, Taille), barre d'outils Précédent / Suivant /
+     Dossier parent / Actualiser / adresse / vues / recherche. -->
+<channel name="thunar" version="1.0">
+  <property name="default-view" type="string" value="ThunarDetailsView"/>
+  <property name="last-view" type="string" value="ThunarDetailsView"/>
+  <property name="last-location-bar" type="string" value="ThunarLocationEntry"/>
+  <property name="last-side-pane" type="string" value="ThunarShortcutsPane"/>
+  <property name="last-menubar-visible" type="bool" value="true"/>
+  <property name="last-statusbar-visible" type="bool" value="true"/>
+  <property name="last-toolbar-items" type="string" value="menu:0,back:1,forward:1,open-parent:1,reload:1,location-bar:1,view-switcher:1,search:1,open-home:0,new-tab:0,new-window:0,toggle-split-view:0,undo:0,redo:0,zoom-out:0,zoom-in:0,zoom-reset:0,view-as-icons:0,view-as-detailed-list:0,view-as-compact-list:0"/>
+  <property name="last-details-view-column-order" type="string" value="THUNAR_COLUMN_NAME,THUNAR_COLUMN_DATE_MODIFIED,THUNAR_COLUMN_TYPE,THUNAR_COLUMN_SIZE,THUNAR_COLUMN_SIZE_IN_BYTES"/>
+  <property name="last-details-view-visible-columns" type="string" value="THUNAR_COLUMN_DATE_MODIFIED,THUNAR_COLUMN_NAME,THUNAR_COLUMN_SIZE,THUNAR_COLUMN_TYPE"/>
+  <property name="misc-date-style" type="string" value="THUNAR_DATE_STYLE_SHORT"/>
+  <property name="misc-single-click" type="bool" value="false"/>
+  <property name="misc-folders-first" type="bool" value="true"/>
+  <property name="misc-full-path-in-tab-title" type="bool" value="true"/>
+  <property name="misc-show-delete-action" type="bool" value="true"/>
+  <property name="misc-confirm-move-to-trash" type="bool" value="false"/>
+  <property name="misc-recursive-search" type="string" value="THUNAR_RECURSIVE_SEARCH_LOCAL"/>
+  <property name="misc-undo-redo-history-size" type="int" value="20"/>
+  <property name="misc-transfer-verify-file" type="string" value="THUNAR_VERIFY_FILE_MODE_NEVER"/>
+  <property name="misc-parallel-copy-mode" type="string" value="THUNAR_PARALLEL_COPY_MODE_ONLY_LOCAL_IDLE_DEVICE"/>
+  <property name="misc-thumbnail-mode" type="string" value="THUNAR_THUMBNAIL_MODE_ONLY_LOCAL"/>
+  <property name="misc-thumbnail-max-file-size" type="uint64" value="10485760"/>
+  <property name="misc-volume-management" type="bool" value="true"/>
+  <property name="last-show-hidden" type="bool" value="false"/>
+  <property name="shortcuts-icon-emblems" type="bool" value="true"/>
+</channel>

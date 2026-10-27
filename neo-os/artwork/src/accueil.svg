@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="300" viewBox="0 0 520 300">
+  <g transform="translate(190,20) scale(0.55)">
+    <rect x="8" y="8" width="240" height="240" rx="60" fill="#0F2B5B"/>
+    <path d="M78 184 V74 L178 184 V74" fill="none" stroke="#FEF9EB" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="196" cy="58" r="20" fill="#7DCDAD"/>
+  </g>
+  <text x="260" y="220" text-anchor="middle" font-family="Inter" font-weight="600" font-size="34" fill="#0F2B5B">Néo OS</text>
+  <text x="260" y="254" text-anchor="middle" font-family="Inter" font-size="16" fill="#0F2B5B" fill-opacity="0.75">Installation sur le disque dur</text>
+</svg>

@@ -1,0 +1,11 @@
+# Néo OS — réglages de session (fichier lu par /etc/X11/Xsession).
+# 1. Réglages XFCE par défaut de Néo, prioritaires sur ceux de Debian, sans
+#    modifier les fichiers des paquets.
+case ":${XDG_CONFIG_DIRS}:" in
+	*:/etc/xdg/neo:*) ;;
+	*) XDG_CONFIG_DIRS="/etc/xdg/neo:${XDG_CONFIG_DIRS:-/etc/xdg}"; export XDG_CONFIG_DIRS ;;
+esac
+# 2. OpenGL logiciel si l'utilisateur l'a choisi (neo-graphique logiciel).
+if [ -f /etc/neo/gl-logiciel ]; then
+	LIBGL_ALWAYS_SOFTWARE=1; export LIBGL_ALWAYS_SOFTWARE
+fi

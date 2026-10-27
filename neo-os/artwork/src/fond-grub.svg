@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768" viewBox="0 0 1024 768">
+  <!-- Fond GRUB : bleu marine, logo en haut à droite, hors de la zone du menu. -->
+  <rect width="1024" height="768" fill="#0F2B5B"/>
+  <g transform="translate(962,10) scale(0.19)">
+    <path d="M58 200 V60 L190 200 V60" fill="none" stroke="#FEF9EB" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="214" cy="40" r="24" fill="#7DCDAD"/>
+  </g>
+  <text x="950" y="42" text-anchor="end" font-family="Inter" font-weight="600" font-size="18" fill="#FEF9EB">Néo OS</text>
+</svg>

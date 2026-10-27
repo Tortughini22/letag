@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Centre Néo
+GenericName=Réglages Néo OS
+Comment=Thème clair ou sombre, effets visuels, pilote d'affichage, mises à jour
+Exec=neo-centre
+Icon=neo-centre
+Categories=Settings;DesktopSettings;X-XFCE-SettingsDialog;X-XFCE-PersonalSettings;
+Keywords=thème;sombre;clair;effets;affichage;nouveau;mise à jour;mémoire;
+StartupNotify=true

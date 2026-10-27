@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Diagnostic Néo
+GenericName=Détection des problèmes
+Comment=Affichage, réseau, stockage, mémoire, mises à jour et applications : problèmes détectés, solutions et rapport
+Exec=neo-diagnostic
+Icon=neo-diagnostic
+Categories=System;Settings;
+Keywords=diagnostic;erreur;problème;panne;rapport;réseau;disque;
+StartupNotify=true

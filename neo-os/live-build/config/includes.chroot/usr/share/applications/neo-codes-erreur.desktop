@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Codes d'erreur
+Comment=Signification des codes NEO-xxx-nnn et solutions
+Exec=exo-open /usr/share/doc/neo/codes-erreur.html
+Icon=help-faq
+Categories=Documentation;

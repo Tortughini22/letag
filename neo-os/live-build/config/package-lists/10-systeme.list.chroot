@@ -1,0 +1,74 @@
+# --- Base système, matériel et maintenance ---------------------------------
+# (apt-recommends est désactivé : chaque paquet est choisi explicitement)
+locales
+console-setup
+keyboard-configuration
+tzdata
+sudo
+bash-completion
+less
+nano
+vim-tiny
+man-db
+manpages-fr
+wget
+curl
+ca-certificates
+rsync
+file
+lsof
+pciutils
+usbutils
+lshw
+dmidecode
+psmisc
+procps
+# hwclock (réglage de l'horloge matérielle à l'installation)
+util-linux-extra
+iproute2
+iputils-ping
+# Microcode Intel (correctifs de sécurité du processeur, dépôt non-free-firmware)
+intel-microcode
+# Mémoire : zram compressé + tueur OOM précoce (évite les gels quand la RAM manque)
+systemd-zram-generator
+earlyoom
+# Mises à jour de sécurité automatiques
+unattended-upgrades
+apt-listchanges
+needrestart
+# Santé du disque dur mécanique
+smartmontools
+testdisk
+# Systèmes de fichiers (lecture des disques/clés USB existants)
+ntfs-3g
+exfatprogs
+dosfstools
+e2fsprogs
+zstd
+btrfs-progs
+xfsprogs
+# Amorçage du système installé (BIOS du HP Z200 ; UEFI pour d'autres machines)
+grub-pc
+grub-efi-amd64-bin
+efibootmgr
+os-prober
+# Réseau (filaire ; NetworkManager gère aussi une éventuelle clé Wi-Fi USB)
+network-manager
+wpasupplicant
+# Son
+pipewire
+pipewire-pulse
+wireplumber
+# Session utilisateur et services de bureau
+dbus-user-session
+polkitd
+pkexec
+udisks2
+upower
+gvfs
+gvfs-backends
+gvfs-fuse
+# Rendu des icônes SVG (Papirus, Néo) dans GTK — sans lui, icônes génériques
+librsvg2-common
+xdg-user-dirs
+xdg-utils

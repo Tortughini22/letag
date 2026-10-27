@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Néo OS — animations
+Exec=neo-animations demarrer
+OnlyShowIn=XFCE;
+NoDisplay=true
+X-GNOME-Autostart-Delay=1

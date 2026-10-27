@@ -1,0 +1,40 @@
+#!/bin/sh
+# neo-mesure — mesure de la mémoire et du démarrage, pour vérifier l'objectif
+# « moins de 700 Mo au repos ». « Utilisée » = MemTotal − MemAvailable, la
+# définition du noyau (le cache disque, récupérable, n'est pas compté).
+# Usage : neo-mesure [--court | --detail]
+#   --detail (administrateur) : part réelle (PSS) de chaque programme, les
+#   bibliothèques partagées étant réparties entre les processus qui les utilisent.
+set -u
+kio() { awk -v k="$1:" '$1 == k {print $2}' /proc/meminfo; }
+total=$(kio MemTotal); dispo=$(kio MemAvailable)
+utilisee=$(( (total - dispo) / 1024 ))
+if [ "${1:-}" = "--court" ]; then
+	echo "$utilisee"
+	exit 0
+fi
+echo "== Néo OS — mesure du $(date '+%d/%m/%Y %H:%M:%S')"
+echo "Système en marche depuis : $(uptime -p 2>/dev/null)"
+echo
+echo "Mémoire utilisée (MemTotal − MemAvailable) : ${utilisee} Mo sur $(( total / 1024 )) Mo"
+echo "  dont mémoire partagée/tmpfs : $(( $(kio Shmem) / 1024 )) Mo"
+echo "  cache disque (récupérable)  : $(( $(kio Cached) / 1024 )) Mo"
+echo "  swap utilisé : $(( ($(kio SwapTotal) - $(kio SwapFree)) / 1024 )) Mo sur $(( $(kio SwapTotal) / 1024 )) Mo"
+if command -v zramctl >/dev/null 2>&1 && [ -e /dev/zram0 ]; then
+	echo; echo "zram :"; zramctl 2>/dev/null
+fi
+echo
+if [ "${1:-}" = "--detail" ] && [ "$(id -u)" -eq 0 ]; then
+	echo "Programmes les plus gourmands (PSS, Mo — total / dont anonyme) :"
+	for p in /proc/[0-9]*; do
+		n=$(cat "$p/comm" 2>/dev/null) || continue
+		awk -v n="$n" '/^Pss:/ {t=$2} /^Pss_Anon:/ {a=$2} END {if (t) print n "\t" t "\t" a+0}' "$p/smaps_rollup" 2>/dev/null
+	done | awk -F'\t' '{t[$1]+=$2; a[$1]+=$3; st+=$2} END {for (k in t) printf "  %7.1f %7.1f  %s\n", t[k]/1024, a[k]/1024, k; printf "  %7.1f          TOTAL\n", st/1024}' | sort -rn | head -n 20
+else
+	echo "Processus les plus gourmands (mémoire résidente, Mo ; bibliothèques partagées"
+	echo "comptées dans chaque processus — « sudo neo-mesure --detail » pour la part réelle) :"
+	ps -eo rss=,comm= --sort=-rss | head -n 15 | awk '{printf "  %7.1f  %s\n", $1/1024, $2}'
+fi
+if command -v systemd-analyze >/dev/null 2>&1; then
+	echo; echo "Démarrage : $(systemd-analyze time 2>/dev/null | head -n 1)"
+fi

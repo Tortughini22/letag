@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=picom
+# Néo OS : picom est lancé par neo-animations selon le niveau choisi.
+Hidden=true

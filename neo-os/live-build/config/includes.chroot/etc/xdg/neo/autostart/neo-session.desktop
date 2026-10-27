@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Néo OS — préparation de la session
+Exec=neo-session
+OnlyShowIn=XFCE;
+NoDisplay=true
+X-XFCE-Autostart-Override=true

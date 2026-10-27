@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Installer Letag OS
-Comment=Installer Letag OS sur le disque dur (aucun effacement automatique)
-Exec=letag-installer
-Icon=letag-installer
-Categories=System;
-Terminal=false
-StartupNotify=true

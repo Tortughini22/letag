@@ -1,0 +1,33 @@
+---
+componentName:  neo
+welcomeStyleCalamares: false
+welcomeExpandingLogo: true
+windowExpanding: normal
+windowSize: 860px,600px
+windowPlacement: center
+strings:
+    productName:         Néo OS
+    shortProductName:    Néo
+    version:             1.0
+    shortVersion:        1.0
+    versionedName:       Néo OS 1.0
+    shortVersionedName:  Néo 1.0
+    bootloaderEntryName: Néo OS
+    productUrl:          https://www.debian.org
+    supportUrl:          https://www.debian.org/support
+    knownIssuesUrl:      https://bugs.debian.org
+    releaseNotesUrl:     https://www.debian.org/releases/trixie/releasenotes
+images:
+    productLogo:         "logo.png"
+    productIcon:         "logo.png"
+    productWelcome:      "accueil.png"
+slideshow:               "show.qml"
+slideshowAPI: 2
+stylesheet: "stylesheet.qss"
+sidebar: widget
+navigation: widget
+style:
+   SidebarBackground:        "#0F2B5B"
+   SidebarText:              "#FEF9EB"
+   SidebarTextCurrent:       "#0F2B5B"
+   SidebarBackgroundCurrent: "#7DCDAD"

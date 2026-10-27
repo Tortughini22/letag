@@ -1,0 +1,37 @@
+# Néo OS — raccourcis clavier (source unique : appliqués par neo-session, affichés par la fiche).
+# type	touche XFCE	action	touches (affichage)	description
+commande	<Primary><Shift>Escape	neo-taches	Ctrl + Maj + Échap	Gestionnaire des tâches
+commande	<Primary><Alt>Delete	neo-menu-session	Ctrl + Alt + Suppr	Menu de session : verrouiller, changer d'utilisateur, se déconnecter, redémarrer, éteindre
+commande	Super_L	xfce4-popup-whiskermenu	Windows	Menu des applications, avec recherche (tapez directement)
+commande	<Super>e	thunar	Windows + E	Gestionnaire de fichiers
+commande	<Super>r	xfce4-appfinder --collapsed	Windows + R	Exécuter une commande
+commande	<Super>i	xfce4-settings-manager	Windows + I	Paramètres
+commande	<Super>l	xflock4	Windows + L	Verrouiller la session
+commande	<Super>s	catfish	Windows + S	Rechercher des fichiers
+commande	<Super><Shift>s	xfce4-screenshooter -r	Windows + Maj + S	Capture d'une zone de l'écran
+commande	Print	xfce4-screenshooter -f	Impr. écran	Capture de tout l'écran
+commande	<Super>t	xfce4-terminal	Windows + T	Terminal
+commande	<Primary><Alt>t	xfce4-terminal	Ctrl + Alt + T	Terminal
+xfwm4	<Super>d	show_desktop_key	Windows + D	Afficher le bureau, puis restaurer les fenêtres
+xfwm4	<Super>Left	tile_left_key	Windows + ←	Placer la fenêtre sur la moitié gauche
+xfwm4	<Super>Right	tile_right_key	Windows + →	Placer la fenêtre sur la moitié droite
+xfwm4	<Super>Up	maximize_window_key	Windows + ↑	Agrandir la fenêtre (de nouveau : restaurer)
+xfwm4	<Super>Down	hide_window_key	Windows + ↓	Réduire la fenêtre dans la barre des tâches
+xfwm4	<Alt>Tab	cycle_windows_key	Alt + Tab	Passer à la fenêtre suivante
+xfwm4	<Alt><Shift>Tab	cycle_reverse_windows_key	Alt + Maj + Tab	Revenir à la fenêtre précédente
+xfwm4	<Alt>F4	close_window_key	Alt + F4	Fermer la fenêtre
+xfwm4	<Primary><Super>Left	left_workspace_key	Ctrl + Windows + ←	Bureau virtuel précédent
+xfwm4	<Primary><Super>Right	right_workspace_key	Ctrl + Windows + →	Bureau virtuel suivant
+natif	-	-	F2	Renommer le fichier sélectionné
+natif	-	-	Ctrl + C / Ctrl + X / Ctrl + V	Copier / couper / coller
+natif	-	-	Ctrl + Z / Ctrl + Y	Annuler / rétablir
+natif	-	-	Ctrl + A	Tout sélectionner
+natif	-	-	Suppr / Maj + Suppr	Mettre à la corbeille / supprimer définitivement (avec confirmation)
+natif	-	-	Ctrl + Maj + N	Nouveau dossier
+natif	-	-	Alt + Entrée	Propriétés du fichier
+natif	-	-	Ctrl + L	Modifier la barre d'adresse
+natif	-	-	Ctrl + F	Rechercher dans le dossier
+natif	-	-	Alt + ↑ / Alt + ← / Alt + →	Dossier parent / précédent / suivant
+natif	-	-	F5	Actualiser
+natif	-	-	Ctrl + 1 / Ctrl + 2 / Ctrl + 3	Vue icônes / liste détaillée / liste compacte
+natif	-	-	Ctrl + T / Ctrl + W	Nouvel onglet / fermer l'onglet
