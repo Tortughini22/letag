@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Applet NetworkManager
+Comment=Gérer les connexions réseau
+# --indicator : icône au format StatusNotifier, affichée par la barre XFCE
+# même sans compositeur (les icônes XEmbed y deviennent invisibles).
+Exec=nm-applet --indicator
+Icon=nm-device-wireless
+NotShowIn=KDE;GNOME;
+X-GNOME-UsesNotifications=true

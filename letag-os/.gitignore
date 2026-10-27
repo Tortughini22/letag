@@ -32,3 +32,9 @@ live-build/config/build
 # Résultats
 sortie/
 tests/vm/
+# Créés par « lb config » (liens vers les crochets par défaut de live-build)
+live-build/.lock
+live-build/config/hooks/live/
+live-build/config/hooks/normal/[1-9]*
+!live-build/config/hooks/normal/*letag*
+live-build/config/package-lists/live.list.chroot

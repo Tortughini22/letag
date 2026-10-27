@@ -42,6 +42,7 @@ ntfs-3g
 exfatprogs
 dosfstools
 e2fsprogs
+zstd
 btrfs-progs
 xfsprogs
 # Amorçage du système installé (BIOS du HP Z200 ; UEFI pour d'autres machines)
@@ -51,6 +52,7 @@ efibootmgr
 os-prober
 # Réseau (filaire ; NetworkManager gère aussi une éventuelle clé Wi-Fi USB)
 network-manager
+wpasupplicant
 # Son
 pipewire
 pipewire-pulse
@@ -64,5 +66,7 @@ upower
 gvfs
 gvfs-backends
 gvfs-fuse
+# Rendu des icônes SVG (Papirus, Letag) dans GTK — sans lui, icônes génériques
+librsvg2-common
 xdg-user-dirs
 xdg-utils

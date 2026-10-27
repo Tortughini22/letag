@@ -2,6 +2,9 @@
 live-boot
 live-config
 live-config-systemd
+# Création de l'utilisateur live (paquets seulement « recommandés » par live-config)
+user-setup
+live-tools
 calamares
 calamares-settings-debian
 # Récupération / diagnostic depuis la clé USB

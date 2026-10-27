@@ -28,6 +28,18 @@ VARIANTES = {
     "Letag-Clair": ("Arc-Lighter", "Letag clair", False),
     "Letag-Sombre": ("Arc-Dark", "Letag sombre", True),
 }
+# Ajouts CSS propres à Letag : étiquettes des icônes du bureau lisibles sur
+# les fonds clair et sombre (xfdesktop les écrit en blanc ombré par défaut).
+CSS_LETAG = """
+/* --- Letag OS --- */
+XfdesktopIconView.view.label {
+  color: %(texte)s;
+  text-shadow: none;
+}
+XfdesktopIconView.view.label:selected {
+  color: #ffffff;
+}
+"""
 TEXT_EXT = (".css", ".rc", ".xpm", ".svg", ".xml", "themerc", "gtkrc", ".theme")
 
 _cache = {}
@@ -159,6 +171,8 @@ def main():
             p = os.path.join(dst, g)
             if os.path.exists(p):
                 recolorer_gresource(p)
+        with open(os.path.join(dst, "gtk-3.0", "gtk.css"), "a") as f:
+            f.write(CSS_LETAG % {"texte": "#F3F3F1" if sombre else "#1B1B1B"})
         with open(os.path.join(dst, "index.theme"), "w") as f:
             f.write("[Desktop Entry]\nType=X-GNOME-Metatheme\nName=%s\n"
                     "Comment=Thème Letag OS dérivé d'Arc (GPL-3.0)\nEncoding=UTF-8\n\n"

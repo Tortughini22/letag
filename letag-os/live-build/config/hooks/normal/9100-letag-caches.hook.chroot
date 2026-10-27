@@ -1,0 +1,11 @@
+#!/bin/sh
+# Letag OS — régénère les caches d'icônes (supprimés par le crochet 9000 de
+# live-build) et le cache des polices. Sans eux, CHAQUE application GTK
+# indexe en mémoire des milliers d'icônes Papirus et toutes les polices :
+# mesuré en VM, 60 à 90 Mo de mémoire en plus par application.
+set -e
+for theme in /usr/share/icons/*/; do
+	[ -f "${theme}index.theme" ] || continue
+	gtk-update-icon-cache --force --quiet "$theme" || true
+done
+fc-cache --force --system-only >/dev/null 2>&1 || fc-cache -f >/dev/null 2>&1 || true

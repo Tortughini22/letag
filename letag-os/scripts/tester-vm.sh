@@ -2,7 +2,8 @@
 # Letag OS — tests en machine virtuelle QEMU, au plus près du HP Z200 :
 #   processeur émulé « Westmere » (même génération que le Core i5-650 :
 #   SSE4.2, AES-NI, PAS d'AVX), 4 Go de RAM, 2 cœurs / 4 threads, BIOS
-#   (SeaBIOS), disque SATA de 320 Go (fichier creux), port série journalisé.
+#   (SeaBIOS, chipset Q35/ICH9 proche du Q57 du Z200), disque SATA de 320 Go
+#   (fichier creux), port série journalisé.
 #
 # Usage :
 #   scripts/tester-vm.sh live      [image.iso]   démarre la session d'essai
@@ -28,9 +29,8 @@ DISQUE="$DIR/disque-320G.qcow2"
 ACCEL="-accel tcg,thread=multi"
 [ -w /dev/kvm ] && ACCEL="-accel kvm"
 
-set -- -machine pc $ACCEL -cpu Westmere -smp 4,cores=2,threads=2 -m 4096 \
+set -- -machine q35 $ACCEL -cpu Westmere -smp 4,cores=2,threads=2 -m 4096 \
 	-device qxl-vga,vgamem_mb=32 -display "${LETAG_VM_AFFICHAGE:-none}" \
-	-device ich9-ahci,id=ahci \
 	-netdev user,id=net0 -device e1000,netdev=net0 \
 	-device ich9-usb-ehci1,id=usb -device usb-tablet,bus=usb.0 \
 	-serial "file:$DIR/serie-$MODE.log" \
@@ -43,7 +43,7 @@ case "$MODE" in
 		if [ "$MODE" = installer ] && [ ! -f "$DISQUE" ]; then
 			qemu-img create -f qcow2 "$DISQUE" 320G
 		fi
-		set -- "$@" -drive "file=$ISO,media=cdrom,if=none,id=cd,readonly=on" -device ide-cd,drive=cd,bus=ahci.0 -boot d
+		set -- "$@" -drive "file=$ISO,media=cdrom,if=none,id=cd,readonly=on" -device ide-cd,drive=cd,bus=ide.0 -boot d
 		if [ -n "${LETAG_VM_OPTIONS:-}" ]; then
 			# Options noyau supplémentaires : on démarre directement le noyau de
 			# l'ISO avec la ligne de commande de l'entrée « Essayer Letag OS ».
@@ -54,12 +54,12 @@ case "$MODE" in
 			set -- "$@" -kernel "$DIR/vmlinuz" -initrd "$DIR/initrd.img" -append "$ligne console=tty0 console=ttyS0,115200 $LETAG_VM_OPTIONS"
 		fi
 		if [ "$MODE" = installer ]; then
-			set -- "$@" -drive "file=$DISQUE,if=none,id=hd" -device ide-hd,drive=hd,bus=ahci.1
+			set -- "$@" -drive "file=$DISQUE,if=none,id=hd" -device ide-hd,drive=hd,bus=ide.1
 		fi
 		;;
 	disque)
 		[ -f "$DISQUE" ] || { echo "Pas de disque installé : lancez d'abord le mode installer." >&2; exit 1; }
-		set -- "$@" -drive "file=$DISQUE,if=none,id=hd" -device ide-hd,drive=hd,bus=ahci.0 -boot c
+		set -- "$@" -drive "file=$DISQUE,if=none,id=hd" -device ide-hd,drive=hd,bus=ide.0 -boot c
 		;;
 	*) echo "Usage : $0 live|installer|disque [image.iso]" >&2; exit 2 ;;
 esac

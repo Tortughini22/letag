@@ -6,25 +6,25 @@ label live
 	append @APPEND_LIVE@
 
 label live-sans-accel
-	menu label Essayer - affichage ^sans acceleration (nouveau.noaccel)
+	menu label Essayer - ^sans acceleration graphique
 	linux @LINUX@
 	initrd @INITRD@
 	append @APPEND_LIVE@ nouveau.noaccel=1
 
 label live-secours
-	menu label Essayer - affichage de ^secours (nomodeset, VESA)
+	menu label Essayer - ^affichage de secours (VESA)
 	linux @LINUX@
 	initrd @INITRD@
 	append @APPEND_LIVE@ nomodeset
 
 label live-toram
-	menu label Essayer - copie en ^memoire vive (toram, lent au depart)
+	menu label Essayer - charge en ^memoire vive (toram)
 	linux @LINUX@
 	initrd @INITRD@
 	append @APPEND_LIVE@ toram
 
 label live-failsafe
-	menu label Mode sans ^echec (pilotes minimaux)
+	menu label Mode sans ^echec
 	linux @LINUX@
 	initrd @INITRD@
 	append @APPEND_LIVE_FAILSAFE@

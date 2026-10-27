@@ -15,9 +15,21 @@ import sys
 import tempfile
 import time
 
-CAR = {" ": "spc", "\n": "ret", "-": "minus", ".": "dot", "/": "slash", ",": "comma",
-       "=": "equal", ";": "semicolon", "'": "apostrophe", "_": "shift-minus",
-       ":": "shift-semicolon", "\"": "shift-apostrophe"}
+# Disposition du clavier invité : Letag OS est en AZERTY (fr). Les touches
+# envoyées par QMP sont physiques (positions QWERTY), d'où cette table.
+AZERTY = {" ": "spc", "\n": "ret", "a": "q", "q": "a", "z": "w", "w": "z", "m": "semicolon",
+          "&": "1", '"': "3", "'": "4", "(": "5", "-": "6", "_": "8", ")": "minus", "=": "equal",
+          "+": "shift-equal", ",": "m", "?": "shift-m", ";": "comma", ".": "shift-comma",
+          ":": "dot", "/": "shift-dot", "!": "slash", "<": "less", ">": "shift-less",
+          "|": "alt_r-6", "#": "alt_r-3", "@": "alt_r-0", "\\": "alt_r-8", "$": "bracket_right",
+          "*": "backslash", "{": "alt_r-4", "}": "alt_r-equal", "[": "alt_r-5", "]": "alt_r-minus"}
+for _c in "0123456789":
+    AZERTY[_c] = "shift-" + _c
+QWERTY = {" ": "spc", "\n": "ret", "-": "minus", ".": "dot", "/": "slash", ",": "comma",
+          "=": "equal", ";": "semicolon", "'": "apostrophe", "_": "shift-minus",
+          ":": "shift-semicolon", '"': "shift-apostrophe", "|": "shift-backslash",
+          ">": "shift-dot", "<": "shift-comma", "&": "shift-7", "*": "shift-8"}
+CAR = QWERTY if os.environ.get("LETAG_VM_CLAVIER") == "us" else AZERTY
 
 
 class QMP:
@@ -64,7 +76,7 @@ def main():
             if ch in CAR:
                 touches(q, CAR[ch])
             elif ch.isupper():
-                touches(q, "shift-" + ch.lower())
+                touches(q, "shift-" + CAR.get(ch.lower(), ch.lower()))
             else:
                 touches(q, ch)
     elif action == "clic":
