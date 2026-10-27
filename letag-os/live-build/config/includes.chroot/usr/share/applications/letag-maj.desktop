@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Mettre à jour le système
+Comment=Installer toutes les mises à jour disponibles
+Exec=xfce4-terminal --hold -T "Mises à jour" -x letag-maj
+Icon=system-software-update
+Categories=System;Settings;
+Keywords=mise à jour;apt;sécurité;

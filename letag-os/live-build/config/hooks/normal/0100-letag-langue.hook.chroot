@@ -1,0 +1,16 @@
+#!/bin/sh
+# Letag OS — français par défaut (locale, clavier AZERTY, fuseau Paris).
+set -e
+sed -i 's/^# *fr_FR.UTF-8 UTF-8/fr_FR.UTF-8 UTF-8/' /etc/locale.gen
+grep -q '^fr_FR.UTF-8 UTF-8' /etc/locale.gen || echo 'fr_FR.UTF-8 UTF-8' >> /etc/locale.gen
+locale-gen
+update-locale LANG=fr_FR.UTF-8 LANGUAGE=fr_FR:fr
+cat > /etc/default/keyboard <<'EOT'
+XKBMODEL="pc105"
+XKBLAYOUT="fr"
+XKBVARIANT="latin9"
+XKBOPTIONS=""
+BACKSPACE="guess"
+EOT
+ln -sf /usr/share/zoneinfo/Europe/Paris /etc/localtime
+echo Europe/Paris > /etc/timezone

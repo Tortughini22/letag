@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768" viewBox="0 0 1024 768">
+  <rect width="1024" height="768" fill="#1B1B1B"/>
+  <g transform="translate(60,640) scale(0.3)">
+    <path d="M70 46 V200 H190" fill="none" stroke="#F3F3F1" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="186" cy="74" r="32" fill="#E23B2E"/>
+  </g>
+  <text x="140" y="690" font-family="Inter" font-weight="600" font-size="28" fill="#F3F3F1">Letag OS</text>
+</svg>

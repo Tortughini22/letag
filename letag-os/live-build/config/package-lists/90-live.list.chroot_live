@@ -1,0 +1,8 @@
+# --- Uniquement dans la session live (retirés après installation) ------------
+live-boot
+live-config
+live-config-systemd
+calamares
+calamares-settings-debian
+# Récupération / diagnostic depuis la clé USB
+gparted

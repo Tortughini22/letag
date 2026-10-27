@@ -1,0 +1,3 @@
+# Letag OS — ordonnanceur d'E/S BFQ pour les disques rotatifs : il préserve la
+# réactivité du bureau quand une tâche de fond (mise à jour, copie) lit le disque.
+ACTION=="add|change", KERNEL=="sd[a-z]*|hd[a-z]*", ATTR{queue/rotational}=="1", ATTR{queue/scheduler}="bfq", ATTR{bdi/read_ahead_kb}="512"

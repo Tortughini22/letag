@@ -1,0 +1,19 @@
+# --- Affichage ---------------------------------------------------------------
+# Quadro FX 380 LP (puce GT218 « NVA8 », famille Tesla/NV50) : pilote libre nouveau.
+# Le pilote propriétaire 340.xx est abandonné par NVIDIA et absent de Debian 13.
+xserver-xorg-core
+xserver-xorg-input-libinput
+xserver-xorg-video-nouveau
+# Pilotes de secours (mode « nomodeset ») et machines virtuelles
+xserver-xorg-video-vesa
+xserver-xorg-video-fbdev
+xserver-xorg-video-qxl
+libgl1-mesa-dri
+mesa-utils
+x11-xserver-utils
+x11-utils
+xinput
+# Écran de connexion
+lightdm
+lightdm-gtk-greeter
+light-locker

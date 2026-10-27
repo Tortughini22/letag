@@ -1,0 +1,29 @@
+#!/bin/sh
+# letag-mesure — mesure de la mémoire et du démarrage, pour vérifier l'objectif
+# « moins de 700 Mo au repos ». « Utilisée » = MemTotal − MemAvailable, la
+# définition du noyau (le cache disque, récupérable, n'est pas compté).
+# Usage : letag-mesure [--court]
+set -u
+kio() { awk -v k="$1:" '$1 == k {print $2}' /proc/meminfo; }
+total=$(kio MemTotal); dispo=$(kio MemAvailable)
+utilisee=$(( (total - dispo) / 1024 ))
+if [ "${1:-}" = "--court" ]; then
+	echo "$utilisee"
+	exit 0
+fi
+echo "== Letag OS — mesure du $(date '+%d/%m/%Y %H:%M:%S')"
+echo "Système en marche depuis : $(uptime -p 2>/dev/null)"
+echo
+echo "Mémoire utilisée (MemTotal − MemAvailable) : ${utilisee} Mo sur $(( total / 1024 )) Mo"
+echo "  dont mémoire partagée/tmpfs : $(( $(kio Shmem) / 1024 )) Mo"
+echo "  cache disque (récupérable)  : $(( $(kio Cached) / 1024 )) Mo"
+echo "  swap utilisé : $(( ($(kio SwapTotal) - $(kio SwapFree)) / 1024 )) Mo sur $(( $(kio SwapTotal) / 1024 )) Mo"
+if command -v zramctl >/dev/null 2>&1 && [ -e /dev/zram0 ]; then
+	echo; echo "zram :"; zramctl 2>/dev/null
+fi
+echo
+echo "Processus les plus gourmands (mémoire résidente, Mo) :"
+ps -eo rss=,comm= --sort=-rss | head -n 15 | awk '{printf "  %7.1f  %s\n", $1/1024, $2}'
+if command -v systemd-analyze >/dev/null 2>&1; then
+	echo; echo "Démarrage : $(systemd-analyze time 2>/dev/null | head -n 1)"
+fi

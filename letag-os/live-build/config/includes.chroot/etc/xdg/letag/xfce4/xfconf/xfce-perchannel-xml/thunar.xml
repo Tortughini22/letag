@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Letag OS : gestionnaire de fichiers simple. Vignettes limitées aux
+     fichiers locaux de moins de 10 Mo pour épargner le disque dur. -->
+<channel name="thunar" version="1.0">
+  <property name="default-view" type="string" value="ThunarIconView"/>
+  <property name="last-side-pane" type="string" value="ThunarShortcutsPane"/>
+  <property name="misc-single-click" type="bool" value="false"/>
+  <property name="misc-thumbnail-mode" type="string" value="THUNAR_THUMBNAIL_MODE_ONLY_LOCAL"/>
+  <property name="misc-thumbnail-max-file-size" type="uint64" value="10485760"/>
+  <property name="misc-folders-first" type="bool" value="true"/>
+  <property name="misc-full-path-in-tab-title" type="bool" value="true"/>
+  <property name="last-show-hidden" type="bool" value="false"/>
+</channel>

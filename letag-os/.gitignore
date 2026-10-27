@@ -1,0 +1,34 @@
+# Éléments générés par artwork/generer.sh
+live-build/config/includes.chroot/usr/share/letag/fonds/
+live-build/config/includes.chroot/usr/share/letag/logo/
+live-build/config/includes.chroot/usr/share/letag/grub/
+live-build/config/includes.chroot/usr/share/backgrounds/
+live-build/config/includes.chroot/usr/share/themes/
+live-build/config/includes.chroot/usr/share/icons/
+live-build/config/includes.chroot/usr/share/doc/letag/
+live-build/config/includes.chroot/etc/calamares/branding/letag/*.png
+live-build/config/bootloaders/syslinux_common/splash.png
+live-build/config/bootloaders/grub-pc/splash.png
+# Construction live-build
+live-build/.build/
+live-build/cache/
+live-build/chroot/
+live-build/binary/
+live-build/local/
+live-build/build.log
+live-build/*.iso
+live-build/*.contents
+live-build/*.files
+live-build/*.packages
+live-build/*.zsync
+live-build/chroot.*
+live-build/binary.*
+live-build/config/binary
+live-build/config/bootstrap
+live-build/config/chroot
+live-build/config/common
+live-build/config/source
+live-build/config/build
+# Résultats
+sortie/
+tests/vm/

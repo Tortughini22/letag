@@ -1,0 +1,4 @@
+#!/bin/sh
+# Construction complète ; le journal est conservé dans build.log.
+set -e
+lb build noauto "${@}" 2>&1 | tee build.log

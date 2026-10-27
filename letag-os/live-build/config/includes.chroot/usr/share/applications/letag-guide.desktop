@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Guide Letag OS
+Comment=Utilisation, mises à jour et récupération
+Exec=exo-open /usr/share/doc/letag/guide.html
+Icon=help-browser
+Categories=Documentation;

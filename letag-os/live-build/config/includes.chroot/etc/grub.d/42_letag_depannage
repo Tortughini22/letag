@@ -1,0 +1,42 @@
+#!/bin/sh
+# Letag OS — entrées GRUB de dépannage (affichage de secours, récupération).
+# Indépendantes du mode graphique par défaut : toujours disponibles.
+set -e
+
+prefix="/usr"
+exec_prefix="/usr"
+datarootdir="/usr/share"
+. "${pkgdatadir:-/usr/share/grub}/grub-mkconfig_lib"
+
+noyau=$(ls -1v /boot/vmlinuz-* 2>/dev/null | tail -n 1)
+[ -n "$noyau" ] || exit 0
+version="${noyau#/boot/vmlinuz-}"
+initrd="initrd.img-${version}"
+[ -f "/boot/${initrd}" ] || exit 0
+
+dossier=$(make_system_path_relative_to_its_root /boot)
+if [ -n "${GRUB_DEVICE_UUID}" ] && [ "${GRUB_DISABLE_LINUX_UUID}" != "true" ]; then
+	racine="root=UUID=${GRUB_DEVICE_UUID}"
+else
+	racine="root=${GRUB_DEVICE}"
+fi
+acces=$(prepare_grub_to_access_device "${GRUB_DEVICE_BOOT}" | sed 's/^/\t\t/')
+
+entree() { # $1 titre, $2 options supplémentaires
+	cat <<EOT
+	menuentry '$1' --class letag {
+		insmod gzio
+${acces}
+		echo 'Chargement de Linux ${version}…'
+		linux ${dossier}/vmlinuz-${version} ${racine} ro ${GRUB_CMDLINE_LINUX} $2
+		initrd ${dossier}/${initrd}
+	}
+EOT
+}
+
+gettext_printf "Ajout des entrées de dépannage Letag OS\n" >&2
+echo "submenu 'Letag OS — dépannage' --class letag {"
+entree "Affichage de secours (sans pilote graphique, nomodeset)" "nomodeset"
+entree "Affichage sans accélération 2D/3D (nouveau.noaccel=1)" "nouveau.noaccel=1"
+entree "Console de récupération (administrateur, sans interface graphique)" "systemd.unit=rescue.target"
+echo "}"

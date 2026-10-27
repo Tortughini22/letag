@@ -1,0 +1,39 @@
+#!/bin/sh
+# letag-session — lancé à chaque ouverture de session XFCE (autostart).
+# Première fois : raccourcis clavier et réglages du terminal. À chaque fois :
+# application du thème (fond d'écran sur les écrans présents).
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/letag"
+mkdir -p "$CONF"
+
+raccourci() { xfconf-query -c xfce4-keyboard-shortcuts -p "$1" -n -t string -s "$2" 2>/dev/null; }
+
+if [ ! -f "$CONF/initialise" ]; then
+	# Touche Super seule : menu des applications (avec recherche).
+	raccourci "/commands/custom/Super_L" "xfce4-popup-whiskermenu"
+	raccourci "/commands/custom/<Super>e" "thunar"
+	raccourci "/commands/custom/<Super>t" "xfce4-terminal"
+	raccourci "/commands/custom/<Super>l" "xflock4"
+	raccourci "/commands/custom/<Super>f" "catfish"
+	raccourci "/commands/custom/<Super>i" "letag-centre"
+	raccourci "/xfwm4/custom/<Super>d" "show_desktop_key"
+	xfconf-query -c xfce4-terminal -p /font-name -n -t string -s "DejaVu Sans Mono 11" 2>/dev/null
+	xfconf-query -c xfce4-terminal -p /misc-menubar-default -n -t bool -s false 2>/dev/null
+	xfconf-query -c xfce4-terminal -p /scrolling-lines -n -t uint -s 5000 2>/dev/null
+	touch "$CONF/initialise"
+fi
+
+letag-theme appliquer
+
+# Session live : icône « Installer Letag OS » sur le bureau.
+if [ -d /run/live/medium ] && [ -x /usr/local/bin/letag-installer ]; then
+	bureau="$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")"
+	mkdir -p "$bureau"
+	icone="$bureau/letag-installer.desktop"
+	if [ ! -f "$icone" ]; then
+		cp /usr/share/applications/letag-installer.desktop "$icone"
+		chmod +x "$icone"
+		gio set --type=string "$icone" metadata::xfce-exe-checksum \
+			"$(sha256sum "$icone" | cut -d' ' -f1)" 2>/dev/null || true
+	fi
+fi
+exit 0

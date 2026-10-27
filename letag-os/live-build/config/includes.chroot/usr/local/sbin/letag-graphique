@@ -1,0 +1,48 @@
+#!/bin/sh
+# letag-graphique — choix du mode d'affichage (administrateur).
+#   auto       : pilote nouveau avec accélération 2D/3D (défaut).
+#   logiciel   : pilote nouveau pour l'affichage, mais OpenGL calculé par le
+#                processeur (llvmpipe). Contourne les plantages 3D de nouveau
+#                sur les cartes Tesla (GT218 de la Quadro FX 380 LP).
+#   sans-accel : nouveau.noaccel=1 — affichage seul, aucune accélération.
+#   secours    : nomodeset — pilote VESA du BIOS, toujours disponible mais
+#                lent, résolution parfois limitée.
+#   etat       : affiche le mode actif.
+# Le changement prend effet au prochain redémarrage.
+set -eu
+
+CFG=/etc/default/grub.d/60-letag-graphique.cfg
+GL=/etc/letag/gl-logiciel
+
+etat() {
+	if [ -f "$CFG" ] && grep -q nomodeset "$CFG"; then echo secours
+	elif [ -f "$CFG" ] && grep -q noaccel "$CFG"; then echo sans-accel
+	elif [ -f "$GL" ]; then echo logiciel
+	else echo auto
+	fi
+}
+
+mode="${1:-etat}"
+if [ "$mode" = etat ]; then etat; exit 0; fi
+case "$mode" in auto|logiciel|sans-accel|secours) ;; *)
+	echo "Usage : $(basename "$0") auto|logiciel|sans-accel|secours|etat" >&2; exit 2 ;;
+esac
+if [ "$(id -u)" -ne 0 ]; then
+	echo "Ce réglage demande les droits administrateur : sudo $(basename "$0") $mode" >&2
+	exit 1
+fi
+
+mkdir -p /etc/letag
+rm -f "$CFG" "$GL"
+case "$mode" in
+	logiciel) : > "$GL" ;;
+	sans-accel) printf '# Écrit par letag-graphique\nGRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT nouveau.noaccel=1"\n' > "$CFG" ;;
+	secours) printf '# Écrit par letag-graphique\nGRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT nomodeset"\n' > "$CFG" ;;
+esac
+
+if [ -z "${LETAG_DANS_CHROOT:-}" ] && [ -d /run/live/medium ]; then
+	echo "Session live : choisissez plutôt le mode dans le menu de démarrage de la clé."
+elif command -v update-grub >/dev/null 2>&1; then
+	update-grub
+fi
+echo "Mode d'affichage : $mode (actif au prochain redémarrage)."

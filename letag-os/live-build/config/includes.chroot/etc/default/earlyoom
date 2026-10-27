@@ -1,0 +1,6 @@
+# Letag OS — earlyoom : quand il reste moins de 5 % de RAM ET moins de 10 % de
+# swap (zram), fermer le processus le plus gourmand AVANT que le système ne gèle.
+# Les onglets de navigateur et LibreOffice sont visés en priorité ; la session
+# graphique est protégée. Pas d'espace dans les motifs (systemd découpe la
+# variable sur les espaces) : « . » remplace l'espace de « Web Content ».
+EARLYOOM_ARGS="-m 5 -s 10 -r 0 --prefer (^|/)(Web.Content|Isolated.Web.Co|WebExtensions|firefox-esr|soffice.bin|celluloid|mpv)$ --avoid (^|/)(Xorg|xfwm4|xfce4-session|xfce4-panel|xfdesktop|lightdm|systemd|systemd-journal|dbus-daemon)$"

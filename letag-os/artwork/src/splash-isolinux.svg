@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480">
+  <rect width="640" height="480" fill="#1B1B1B"/>
+  <g transform="translate(40,40) scale(0.25)">
+    <path d="M70 46 V200 H190" fill="none" stroke="#F3F3F1" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="186" cy="74" r="32" fill="#E23B2E"/>
+  </g>
+  <text x="112" y="80" font-family="Inter" font-weight="600" font-size="30" fill="#F3F3F1">Letag OS</text>
+  <text x="112" y="104" font-family="Inter" font-size="14" fill="#8A8A85">Système léger pour HP Z200 · base Debian 13</text>
+  <rect x="40" y="136" width="560" height="1" fill="#2E2E2D"/>
+  <circle cx="600" cy="440" r="6" fill="#E23B2E"/>
+</svg>

@@ -1,0 +1,8 @@
+[user]
+pinned=/usr/share/applications/firefox-esr.desktop;/usr/share/applications/thunar.desktop;/usr/share/applications/xfce4-terminal.desktop;/usr/share/applications/geany.desktop;/usr/share/applications/libreoffice-writer.desktop;
+noWindowsListIfSingle=true
+onlyDisplayVisible=false
+onlyDisplayScreen=false
+showPreviews=false
+indicatorOrientation=0
+indicatorStyle=0

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Icône « Centre Letag » : réglages (curseurs) -->
+  <rect x="8" y="8" width="240" height="240" rx="60" fill="#1B1B1B"/>
+  <g stroke="#F3F3F1" stroke-width="14" stroke-linecap="round">
+    <path d="M64 84 H192"/><path d="M64 128 H192"/><path d="M64 172 H192"/>
+  </g>
+  <circle cx="100" cy="84" r="17" fill="#E23B2E"/>
+  <circle cx="160" cy="128" r="17" fill="#F3F3F1"/>
+  <circle cx="120" cy="172" r="17" fill="#F3F3F1"/>
+</svg>

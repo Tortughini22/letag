@@ -1,0 +1,11 @@
+# Letag OS — réglages de session (fichier lu par /etc/X11/Xsession).
+# 1. Réglages XFCE par défaut de Letag, prioritaires sur ceux de Debian, sans
+#    modifier les fichiers des paquets.
+case ":${XDG_CONFIG_DIRS}:" in
+	*:/etc/xdg/letag:*) ;;
+	*) XDG_CONFIG_DIRS="/etc/xdg/letag:${XDG_CONFIG_DIRS:-/etc/xdg}"; export XDG_CONFIG_DIRS ;;
+esac
+# 2. OpenGL logiciel si l'utilisateur l'a choisi (letag-graphique logiciel).
+if [ -f /etc/letag/gl-logiciel ]; then
+	LIBGL_ALWAYS_SOFTWARE=1; export LIBGL_ALWAYS_SOFTWARE
+fi

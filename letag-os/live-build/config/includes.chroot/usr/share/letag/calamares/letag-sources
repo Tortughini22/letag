@@ -1,0 +1,22 @@
+#!/bin/sh
+# Letag OS / Calamares — dépôts Debian 13 du système installé (HTTPS),
+# sécurité comprise. ($1 = racine du système installé)
+CIBLE="$1"
+[ -d "$CIBLE/etc/apt" ] || exit 1
+rm -f "$CIBLE/etc/apt/sources.list"
+mkdir -p "$CIBLE/etc/apt/sources.list.d"
+cat > "$CIBLE/etc/apt/sources.list.d/debian.sources" <<EOT
+# Letag OS repose sur Debian 13 « trixie ». Voir https://wiki.debian.org/SourcesList
+Types: deb
+URIs: https://deb.debian.org/debian
+Suites: trixie trixie-updates
+Components: main contrib non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: https://security.debian.org/debian-security
+Suites: trixie-security
+Components: main contrib non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+EOT
+exit 0

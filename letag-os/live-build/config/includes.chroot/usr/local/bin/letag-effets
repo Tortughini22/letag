@@ -1,0 +1,40 @@
+#!/bin/sh
+# letag-effets — profil d'effets visuels.
+#   minimal   : aucune composition, aucune ombre, aucune animation (défaut,
+#               le plus sûr avec le pilote nouveau et le plus économe).
+#   equilibre : composition xfwm4 (XRender) avec ombres sobres, sans
+#               transparence ni animation. À essayer si l'affichage est stable.
+#   etat      : affiche le profil actif.
+set -eu
+
+regler() { xfconf-query -c "$1" -p "$2" -n -t "$3" -s "$4"; }
+
+case "${1:-etat}" in
+	minimal)
+		regler xfwm4 /general/use_compositing bool false
+		regler xfwm4 /general/show_frame_shadow bool false
+		regler xfwm4 /general/show_popup_shadow bool false
+		regler xsettings /Gtk/EnableAnimations bool false
+		;;
+	equilibre)
+		regler xfwm4 /general/use_compositing bool true
+		regler xfwm4 /general/vblank_mode string auto
+		regler xfwm4 /general/show_frame_shadow bool true
+		regler xfwm4 /general/show_popup_shadow bool true
+		regler xfwm4 /general/show_dock_shadow bool false
+		regler xfwm4 /general/frame_opacity int 100
+		regler xfwm4 /general/inactive_opacity int 100
+		regler xfwm4 /general/move_opacity int 100
+		regler xfwm4 /general/popup_opacity int 100
+		regler xsettings /Gtk/EnableAnimations bool false
+		;;
+	etat)
+		if [ "$(xfconf-query -c xfwm4 -p /general/use_compositing 2>/dev/null)" = true ]; then
+			echo equilibre
+		else
+			echo minimal
+		fi
+		exit 0
+		;;
+	*) echo "Usage : $(basename "$0") minimal|equilibre|etat" >&2; exit 2 ;;
+esac

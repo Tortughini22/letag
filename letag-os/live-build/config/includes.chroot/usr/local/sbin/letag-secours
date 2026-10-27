@@ -1,0 +1,72 @@
+#!/bin/sh
+# letag-secours — outil de récupération à lancer depuis la clé USB Letag OS
+# (session live) pour réparer un Letag OS installé qui ne démarre plus.
+# Ne formate rien et n'efface aucune donnée.
+set -eu
+
+if [ "$(id -u)" -ne 0 ]; then exec sudo "$0" "$@"; fi
+
+CIBLE=/mnt/letag-cible
+
+monter() {
+	echo "Partitions Linux détectées :"
+	lsblk -rpo NAME,FSTYPE,SIZE,LABEL | awk '$2 ~ /^(ext4|xfs|btrfs)$/ {print "  " $1 "  " $2 "  " $3 "  " $4}'
+	printf "Partition racine (/) du système installé (ex. /dev/sda2) : "
+	read -r part
+	[ -b "$part" ] || { echo "Partition introuvable."; exit 1; }
+	mkdir -p "$CIBLE"
+	mountpoint -q "$CIBLE" || mount "$part" "$CIBLE"
+	[ -f "$CIBLE/etc/fstab" ] || { echo "Ce n'est pas une racine Linux."; umount "$CIBLE"; exit 1; }
+	# /boot et /boot/efi séparés éventuels, d'après le fstab du système installé
+	for pm in /boot /boot/efi; do
+		dev=$(awk -v p="$pm" '$1 !~ /^#/ && $2 == p {print $1}' "$CIBLE/etc/fstab")
+		[ -n "$dev" ] && ! mountpoint -q "$CIBLE$pm" && mount "$(findfs "$dev" 2>/dev/null || echo "$dev")" "$CIBLE$pm" || true
+	done
+	for m in dev dev/pts proc sys run; do
+		mountpoint -q "$CIBLE/$m" || mount --bind "/$m" "$CIBLE/$m"
+	done
+}
+
+demonter() {
+	for m in run sys proc dev/pts dev boot/efi boot ""; do
+		mountpoint -q "$CIBLE/$m" 2>/dev/null && umount "$CIBLE/$m" || true
+	done
+}
+trap demonter EXIT
+
+echo "=== Letag OS — récupération ==="
+echo "1) Réinstaller le chargeur de démarrage GRUB"
+echo "2) Revenir au mode d'affichage automatique (si l'écran reste noir)"
+echo "3) Ouvrir un terminal administrateur dans le système installé"
+echo "4) Quitter"
+printf "Choix : "
+read -r choix
+case "$choix" in
+	1)
+		monter
+		lsblk -dpno NAME,SIZE,MODEL | grep -v '^/dev/\(loop\|sr\|zram\)'
+		printf "Disque où installer GRUB (ex. /dev/sda — le disque, pas une partition) : "
+		read -r disque
+		[ -b "$disque" ] || { echo "Disque introuvable."; exit 1; }
+		printf "Confirmer l'installation de GRUB sur %s ? [o/N] " "$disque"
+		read -r ok
+		[ "$ok" = o ] || [ "$ok" = O ] || exit 0
+		if [ -d /sys/firmware/efi ]; then
+			chroot "$CIBLE" grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=letag
+		else
+			chroot "$CIBLE" grub-install --target=i386-pc "$disque"
+		fi
+		chroot "$CIBLE" update-grub
+		echo "GRUB réinstallé."
+		;;
+	2)
+		monter
+		LETAG_DANS_CHROOT=1 chroot "$CIBLE" /usr/local/sbin/letag-graphique auto
+		;;
+	3)
+		monter
+		echo "Terminal dans le système installé ; tapez « exit » pour quitter."
+		chroot "$CIBLE" /bin/bash -l || true
+		;;
+	*) exit 0 ;;
+esac

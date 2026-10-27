@@ -1,0 +1,27 @@
+# --- Applications ------------------------------------------------------------
+# Navigateur maintenu : Firefox ESR (suivi par l'équipe sécurité Debian)
+firefox-esr
+firefox-esr-l10n-fr
+webext-ublock-origin-firefox
+# Bureautique
+libreoffice-writer
+libreoffice-calc
+libreoffice-impress
+libreoffice-gtk3
+libreoffice-l10n-fr
+libreoffice-style-colibre
+hunspell-fr
+hyphen-fr
+mythes-fr
+atril
+# Vidéo et musique (décodage logiciel : pas de décodage matériel avec nouveau sur GT218)
+celluloid
+mpv
+gstreamer1.0-plugins-good
+# Programmation
+geany
+git
+build-essential
+python3-venv
+python3-pip
+make

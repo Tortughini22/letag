@@ -1,0 +1,3 @@
+// Letag OS — pas de paquets « recommandés » automatiques : le système reste
+// léger. Pour un paquet précis : apt install --install-recommends <paquet>
+APT::Install-Recommends "false";

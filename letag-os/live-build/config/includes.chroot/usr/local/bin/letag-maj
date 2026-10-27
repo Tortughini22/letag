@@ -1,0 +1,24 @@
+#!/bin/sh
+# letag-maj — met à jour tout le système (paquets Debian et sécurité).
+# Les mises à jour de sécurité s'installent déjà seules chaque jour
+# (unattended-upgrades) ; cet outil applique aussi les autres.
+set -eu
+if [ "$(id -u)" -ne 0 ]; then
+	exec pkexec /usr/local/bin/letag-maj "$@"
+fi
+export DEBIAN_FRONTEND=readline
+echo "== Recherche des mises à jour…"
+apt-get update
+echo
+echo "== Installation…"
+apt-get full-upgrade
+echo
+echo "== Nettoyage…"
+apt-get autoremove --purge -y
+apt-get clean
+if [ -f /var/run/reboot-required ]; then
+	echo
+	echo "Un redémarrage est nécessaire pour terminer (nouveau noyau ou bibliothèque système)."
+fi
+echo
+echo "Terminé."
